@@ -1,5 +1,5 @@
 /* Melbourne Karaoke — service worker (PWA offline shell). */
-const CACHE = "mk-v1";
+const CACHE = "mk-v2";
 const SHELL = [
   "/tablet",
   "/static/css/style.css",
