@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Karaoke Player</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    html, body { height: 100%; background:#000; overflow:hidden; }
+    #stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
+    video, canvas { max-width:100%; max-height:100%; background:#000; }
+    canvas { image-rendering: pixelated; width:auto; height:100%; aspect-ratio: 300/216; }
+    #idle { color:#556; text-align:center; font-size:28px; font-family:"Segoe UI",sans-serif; }
+    #overlay {
+      position:fixed; left:0; right:0; bottom:0; padding:18px 26px;
+      background:linear-gradient(transparent, rgba(0,0,0,.85));
+      color:#fff; font-family:"Segoe UI",sans-serif; font-size:26px;
+      text-shadow:0 2px 6px #000; transition:opacity .4s;
+    }
+    #overlay small{ color:#2de2e6; font-size:16px; letter-spacing:1px; text-transform:uppercase; display:block; }
+    #tapstart {
+      position:fixed; inset:0; background:#000; color:#fff; display:flex;
+      align-items:center; justify-content:center; flex-direction:column; gap:16px;
+      font-family:"Segoe UI",sans-serif; cursor:pointer; z-index:50;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div id="idle">🎤 Ready — add a song from your tablet</div>
+    <video id="video" style="display:none" playsinline></video>
+    <canvas id="cdg" style="display:none"></canvas>
+    <audio id="audio" style="display:none"></audio>
+  </div>
+  <div id="overlay" style="display:none"><small id="singer"></small><span id="title"></span></div>
+
+  <div id="tapstart">
+    <div style="font-size:40px">📺 Karaoke Player</div>
+    <div style="color:#8b90b5">Tap / click anywhere to start</div>
+  </div>
+
+  <script src="/static/js/common.js"></script>
+  <script src="/static/js/cdg.js"></script>
+  <script src="/static/js/player.js"></script>
+</body>
+</html>

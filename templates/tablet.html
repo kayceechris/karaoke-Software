@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Request a Song</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="bar">
+    <h1>🎤 Request a Song</h1>
+    <div class="spacer"></div>
+  </header>
+
+  <div class="wrap">
+    <div class="searchbar">
+      <input id="q" type="search" placeholder="Search song or artist…" autocomplete="off">
+    </div>
+
+    <div id="results" class="list"></div>
+
+    <div class="section-title">Up next</div>
+    <div id="queue" class="list"></div>
+  </div>
+
+  <div id="toast"></div>
+  <script src="/static/js/common.js"></script>
+  <script src="/static/js/tablet.js"></script>
+</body>
+</html>

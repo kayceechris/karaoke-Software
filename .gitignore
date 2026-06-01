@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local databases (recreated automatically)
+*.db
+
+# Downloaded / local media — don't commit copyrighted files
+songs/*
+!songs/README.txt
+
+# Env
+.env

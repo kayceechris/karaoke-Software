@@ -1,0 +1,21 @@
+@echo off
+REM ---- Karaoke LAPTOP agent launcher (Windows) ----
+cd /d "%~dp0"
+
+REM ===== EDIT THESE TWO LINES after you deploy the cloud =====
+set CLOUD_URL=https://your-app.onrender.com
+set HOST_TOKEN=paste-your-host-token-here
+REM ==========================================================
+
+if not exist ".venv\" (
+    echo Creating virtual environment...
+    python -m venv .venv
+    call .venv\Scripts\activate.bat
+    echo Installing dependencies...
+    pip install -r requirements.txt
+) else (
+    call .venv\Scripts\activate.bat
+)
+
+python agent.py
+pause

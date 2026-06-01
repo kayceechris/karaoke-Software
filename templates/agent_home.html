@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Karaoke Agent</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="bar"><h1>💻 Karaoke Agent (laptop)</h1></header>
+  <div class="wrap">
+    <p>Connected to cloud: <code class="url">{{ cloud }}</code></p>
+    <p>Open the player fullscreen on the TV:</p>
+    <p><code class="url">http://{{ ip }}:{{ port }}/player</code></p>
+    <div class="cards">
+      <a class="card" href="/player"><h2>📺 Player</h2><p>Plays local files on the TV</p></a>
+    </div>
+  </div>
+</body>
+</html>

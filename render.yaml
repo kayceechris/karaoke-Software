@@ -1,0 +1,23 @@
+# Render Blueprint — deploy the karaoke cloud brain + a free Postgres DB.
+# In Render: New + -> Blueprint -> connect this repo. HOST_TOKEN is generated
+# for you (copy it from the service's Environment tab to use on the laptop agent).
+services:
+  - type: web
+    name: karaoke
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn cloud_app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: HOST_TOKEN
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: karaoke-db
+          property: connectionString
+
+databases:
+  - name: karaoke-db
+    plan: free

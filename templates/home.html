@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Karaoke Server</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="bar"><h1>🎤 Karaoke Server</h1></header>
+  <div class="wrap">
+    <p>Connect devices to the same Wi‑Fi, then open:</p>
+    <p>Tablet/guest URL: <code class="url">http://{{ ip }}:{{ port }}/tablet</code></p>
+    <div class="cards">
+      <a class="card" href="/tablet"><h2>📱 Tablet</h2><p>Guests search &amp; request songs</p></a>
+      <a class="card" href="/admin"><h2>🎛️ Admin</h2><p>Control playback &amp; queue</p></a>
+      <a class="card" href="/player"><h2>📺 Player</h2><p>Fullscreen output for the TV</p></a>
+    </div>
+  </div>
+</body>
+</html>

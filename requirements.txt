@@ -1,0 +1,7 @@
+# Cloud brain (Render) needs: Flask, gunicorn, psycopg2, requests
+# Laptop agent needs: Flask, requests
+# Offline LAN app (app.py) needs: Flask
+Flask==3.0.3
+gunicorn==22.0.0
+psycopg2-binary==2.9.9
+requests==2.32.3

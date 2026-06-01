@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Karaoke (Cloud)</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="bar"><h1>🎤 Karaoke — Cloud</h1></header>
+  <div class="wrap">
+    <p>This is the online brain (queue + requests). Songs play on the venue laptop.</p>
+    <p>Guest URL to share / put on a QR code:</p>
+    <p><code class="url">{{ public_url }}/tablet</code></p>
+    <div class="cards">
+      <a class="card" href="/tablet"><h2>📱 Tablet</h2><p>Guests request songs</p></a>
+      <a class="card" href="/admin"><h2>🎛️ Admin</h2><p>Host controls (needs token)</p></a>
+    </div>
+  </div>
+</body>
+</html>

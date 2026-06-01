@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Karaoke Admin</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="bar">
+    <h1>🎛️ Admin</h1>
+    <div class="spacer"></div>
+    <button class="ghost" id="reindex">Rescan songs</button>
+    <a href="/player" target="_blank"><button class="ghost">Open player ↗</button></a>
+  </header>
+
+  <div class="wrap">
+    <div class="nowbar" id="now"><small>Now playing</small><div id="nowtitle">—</div></div>
+
+    <div class="controls">
+      <button class="primary" id="play">▶ Play</button>
+      <button id="pause">⏸ Pause</button>
+      <button id="next">⏭ Next</button>
+      <button class="danger" id="stop">⏹ Stop</button>
+      <div class="vol">🔊 <input id="vol" type="range" min="0" max="1" step="0.05" value="1"></div>
+    </div>
+
+    <div class="section-title">Queue</div>
+    <div id="queue" class="list"></div>
+  </div>
+
+  <div id="toast"></div>
+  <script>window.NEEDS_AUTH = {{ auth|default(false)|tojson }};</script>
+  <script src="/static/js/common.js"></script>
+  <script src="/static/js/admin.js"></script>
+</body>
+</html>
