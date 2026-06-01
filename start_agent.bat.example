@@ -12,12 +12,10 @@ REM ==========================================================
 if not exist ".venv\" (
     echo Creating virtual environment...
     python -m venv .venv
-    call .venv\Scripts\activate.bat
-    echo Installing dependencies...
-    pip install -r requirements.txt
-) else (
-    call .venv\Scripts\activate.bat
 )
+call .venv\Scripts\activate.bat
+echo Installing/updating dependencies...
+python -m pip install -q -r requirements-agent.txt
 
 python agent.py
 pause
