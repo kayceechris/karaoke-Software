@@ -73,6 +73,12 @@ def admin():
     return render_template("admin.html", auth=bool(HOST_TOKEN))
 
 
+@app.route("/player")
+def player_info():
+    # The real player runs on the laptop agent; the cloud can't play local files.
+    return render_template("cloud_player_info.html")
+
+
 # ---- PWA: serve service worker + manifest from root scope ----
 @app.route("/sw.js")
 def sw():
