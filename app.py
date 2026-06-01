@@ -16,14 +16,17 @@ Songs are read from the local SONGS_DIR folder. Supported formats:
 Run:  python app.py
 """
 
+import io
 import os
 import socket
 import sqlite3
 from contextlib import closing
 
+import qrcode
+import qrcode.image.svg
 from flask import (
     Flask, g, jsonify, render_template, request,
-    send_file, abort,
+    send_file, abort, Response,
 )
 
 # --------------------------------------------------------------------------
@@ -190,6 +193,25 @@ def sw():
 def manifest():
     return send_file(os.path.join(app.static_folder, "manifest.webmanifest"),
                      mimetype="application/manifest+json")
+
+
+def _tablet_url():
+    return f"http://{local_ip()}:{PORT}/tablet"
+
+
+@app.route("/qr.svg")
+def qr_svg():
+    img = qrcode.make(_tablet_url(),
+                      image_factory=qrcode.image.svg.SvgPathImage,
+                      box_size=12, border=2)
+    buf = io.BytesIO()
+    img.save(buf)
+    return Response(buf.getvalue(), mimetype="image/svg+xml")
+
+
+@app.route("/qr")
+def qr_page():
+    return render_template("qr.html", url=_tablet_url())
 
 
 @app.route("/player")

@@ -12,8 +12,6 @@ if (window.NEEDS_AUTH && !localStorage.getItem("host_token")) {
   if (t) localStorage.setItem("host_token", t.trim());
 }
 
-const ICON = { video: "🎬", cdg: "🎤", audio: "🎵" };
-
 async function cmd(action, value) {
   try {
     await api("/api/player/command", {
@@ -84,8 +82,8 @@ async function refresh() {
     div.className = "card queue-item" + (playing ? " playing" : "");
     div.innerHTML = `
       <div class="pos">${playing ? "▶" : i}</div>
-      <div class="cover">${ICON[it.kind] || "🎵"}</div>
       <div class="meta"><div class="title"></div><div class="artist"></div></div>`;
+    div.children[0].after(coverEl(it));
     div.querySelector(".title").textContent = it.title;
     div.querySelector(".artist").textContent = (it.artist || "Unknown") + " · 🎤 " + it.singer;
 

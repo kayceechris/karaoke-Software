@@ -14,8 +14,6 @@ const reqCancel = document.getElementById("reqCancel");
 let searchTimer = null;
 let pendingSong = null;
 
-const ICON = { video: "🎬", cdg: "🎤", audio: "🎵" };
-
 function stagger(container) {
   [...container.children].forEach((c, i) => {
     c.style.animationDelay = Math.min(i * 40, 400) + "ms";
@@ -35,13 +33,13 @@ async function search() {
     const div = document.createElement("div");
     div.className = "card";
     div.innerHTML = `
-      <div class="cover">${ICON[s.kind] || "🎵"}</div>
       <div class="meta">
         <div class="title"></div>
         <div class="artist"></div>
       </div>
       <span class="tag"></span>
       <button class="btn btn-primary">Request</button>`;
+    div.prepend(coverEl(s));
     div.querySelector(".title").textContent = s.title;
     div.querySelector(".artist").textContent = s.artist || "Unknown artist";
     div.querySelector(".tag").textContent = (KIND_LABEL[s.kind] || s.kind);
@@ -98,6 +96,7 @@ async function loadQueue() {
     div.innerHTML = `
       <div class="pos">${playing ? "▶" : i}</div>
       <div class="meta"><div class="title"></div><div class="artist"></div></div>`;
+    div.children[0].after(coverEl(it));
     div.querySelector(".title").textContent = it.title;
     div.querySelector(".artist").textContent =
       (it.artist || "Unknown") + " · 🎤 " + it.singer;

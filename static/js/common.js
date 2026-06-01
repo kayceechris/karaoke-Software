@@ -26,6 +26,26 @@ async function api(url, opts) {
 }
 
 const KIND_LABEL = { video: "Video", cdg: "MP3+G", audio: "Audio" };
+const KIND_ICON = { video: "🎬", cdg: "🎤", audio: "🎵" };
+
+// Deterministic "cover art": a unique gradient per song (hashed from name),
+// so every track gets its own colourful thumbnail without any network calls.
+function coverStyle(seed) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const h1 = h % 360;
+  const h2 = (h1 + 40 + (h >> 5) % 120) % 360;
+  return `background-image:linear-gradient(135deg,hsl(${h1} 78% 58%),hsl(${h2} 82% 42%));`;
+}
+
+// Build a cover thumbnail element for a song.
+function coverEl(song) {
+  const d = document.createElement("div");
+  d.className = "cover";
+  d.style.cssText = coverStyle((song.artist || "") + (song.title || ""));
+  d.textContent = KIND_ICON[song.kind] || "🎵";
+  return d;
+}
 
 // ---- PWA: register service worker + handle the install button ----
 if ("serviceWorker" in navigator) {

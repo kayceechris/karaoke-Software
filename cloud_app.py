@@ -18,10 +18,14 @@ Env vars:
   HOST_TOKEN    shared secret for admin + agent. Unset -> auth disabled (dev).
 """
 
+import io
 import os
 from functools import wraps
 
-from flask import (Flask, jsonify, render_template, request, abort, send_file)
+import qrcode
+import qrcode.image.svg
+from flask import (Flask, jsonify, render_template, request, abort, send_file,
+                   Response)
 
 import db
 
@@ -83,6 +87,28 @@ def sw():
 def manifest():
     return send_file(os.path.join(app.static_folder, "manifest.webmanifest"),
                      mimetype="application/manifest+json")
+
+
+# ---- QR code: printable poster guests scan to open /tablet ----
+def _tablet_url():
+    # Render terminates TLS upstream, so trust the forwarded scheme for https.
+    scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
+    return f"{scheme}://{request.host}/tablet"
+
+
+@app.route("/qr.svg")
+def qr_svg():
+    img = qrcode.make(_tablet_url(),
+                      image_factory=qrcode.image.svg.SvgPathImage,
+                      box_size=12, border=2)
+    buf = io.BytesIO()
+    img.save(buf)
+    return Response(buf.getvalue(), mimetype="image/svg+xml")
+
+
+@app.route("/qr")
+def qr_page():
+    return render_template("qr.html", url=_tablet_url())
 
 
 # --------------------------------------------------------------------------
