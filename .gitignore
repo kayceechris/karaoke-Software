@@ -11,5 +11,7 @@ venv/
 songs/*
 !songs/README.txt
 
-# Env
+# Env / secrets
 .env
+# Contains your real HOST_TOKEN — keep local. Use start_agent.bat.example as the template.
+start_agent.bat

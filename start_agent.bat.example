@@ -1,5 +1,7 @@
 @echo off
 REM ---- Karaoke LAPTOP agent launcher (Windows) ----
+REM Copy this file to "start_agent.bat" and fill in your values.
+REM start_agent.bat is git-ignored so your token never gets committed.
 cd /d "%~dp0"
 
 REM ===== EDIT THESE TWO LINES after you deploy the cloud =====
