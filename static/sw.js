@@ -5,7 +5,7 @@ const SHELL = [
   "/static/css/style.css",
   "/static/js/common.js",
   "/static/js/tablet.js",
-  "/static/img/logo.svg",
+  "/static/img/logo.png",
   "/static/manifest.webmanifest",
   "/static/img/icon-192.png",
 ];
