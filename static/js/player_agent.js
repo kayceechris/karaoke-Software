@@ -85,25 +85,36 @@ async function loadSong(it) {
 
 function activeMedia() { return currentKind === "video" ? video : audio; }
 
+let polling = false;
 async function poll() {
-  let state;
-  try { state = await fetch("/api/state").then(r => r.json()); }
-  catch (e) { return; }
-  volume = state.volume ?? 1.0;
-  video.volume = volume; audio.volume = volume;
+  if (polling) return;        // don't overlap: a slow cloud reply could double-load
+  polling = true;
+  try {
+    let state;
+    try { state = await fetch("/api/state").then(r => r.json()); }
+    catch (e) { return; }
+    // Skip ticks where the cloud was unreachable or the reply is malformed —
+    // keep playing the current song instead of resetting it.
+    if (!state || state.unavailable || typeof state.status === "undefined") return;
 
-  if (!state.current) {
-    currentQueueId = null; currentKind = null;
-    video.pause(); audio.pause();
-    hideAll();
-    return;
+    volume = state.volume ?? 1.0;
+    video.volume = volume; audio.volume = volume;
+
+    if (!state.current) {
+      currentQueueId = null; currentKind = null;
+      video.pause(); audio.pause();
+      hideAll();
+      return;
+    }
+    if (state.current.queue_id !== currentQueueId) { await loadSong(state.current); return; }
+
+    const m = activeMedia();
+    if (state.status === "playing" && m.paused && unlocked) m.play().catch(() => {});
+    else if (state.status === "paused" && !m.paused) m.pause();
+    else if (state.status === "stopped") m.pause();
+  } finally {
+    polling = false;
   }
-  if (state.current.queue_id !== currentQueueId) { await loadSong(state.current); return; }
-
-  const m = activeMedia();
-  if (state.status === "playing" && m.paused && unlocked) m.play().catch(() => {});
-  else if (state.status === "paused" && !m.paused) m.pause();
-  else if (state.status === "stopped") m.pause();
 }
 
 function renderLoop() {

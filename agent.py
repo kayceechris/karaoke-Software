@@ -125,12 +125,15 @@ def player():
 
 @app.route("/api/state")
 def api_state():
+    # NOTE: never report current=None on error — the player would treat the next
+    # successful poll as a new song and restart it from 0:00. Signal "unavailable"
+    # instead so the player simply skips that tick and keeps playing.
     if not CLOUD_URL:
-        return jsonify(error="CLOUD_URL not set"), 503
+        return jsonify(unavailable=True), 200
     try:
         return jsonify(cloud_get("/api/player/state"))
     except requests.RequestException:
-        return jsonify(status="stopped", current=None, volume=1.0, seq=0)
+        return jsonify(unavailable=True), 200
 
 
 @app.route("/api/ended", methods=["POST"])
