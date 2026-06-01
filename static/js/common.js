@@ -26,3 +26,30 @@ async function api(url, opts) {
 }
 
 const KIND_LABEL = { video: "Video", cdg: "MP3+G", audio: "Audio" };
+
+// ---- PWA: register service worker + handle the install button ----
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
+
+let deferredPrompt = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const btn = document.getElementById("installBtn");
+  if (btn) {
+    btn.classList.add("show");
+    btn.onclick = async () => {
+      btn.classList.remove("show");
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+    };
+  }
+});
+window.addEventListener("appinstalled", () => {
+  const btn = document.getElementById("installBtn");
+  if (btn) btn.classList.remove("show");
+});

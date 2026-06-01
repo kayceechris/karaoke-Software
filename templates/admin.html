@@ -2,30 +2,48 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Karaoke Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Melbourne Karaoke — Admin</title>
+  <meta name="theme-color" content="#0a0c1a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Karaoke Admin">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/img/icon-192.png">
+  <link rel="icon" href="/static/img/logo.svg">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  <header class="bar">
-    <h1>🎛️ Admin</h1>
+  <div class="bgblob"></div>
+
+  <header class="appbar">
+    <img class="logo" src="/static/img/logo.png" alt="Melbourne Karaoke"
+         onerror="this.onerror=null;this.src='/static/img/logo.svg'">
+    <div class="brand"><b>Melbourne Karaoke</b><span>Admin console</span></div>
     <div class="spacer"></div>
-    <button class="ghost" id="reindex">Rescan songs</button>
-    <a href="/player" target="_blank"><button class="ghost">Open player ↗</button></a>
+    <button class="btn btn-ghost btn-icon" id="reindex" title="Rescan songs">⟳</button>
+    <a href="/player" target="_blank"><button class="btn btn-ghost">📺 Player</button></a>
   </header>
 
   <div class="wrap">
-    <div class="nowbar" id="now"><small>Now playing</small><div id="nowtitle">—</div></div>
-
-    <div class="controls">
-      <button class="primary" id="play">▶ Play</button>
-      <button id="pause">⏸ Pause</button>
-      <button id="next">⏭ Next</button>
-      <button class="danger" id="stop">⏹ Stop</button>
-      <div class="vol">🔊 <input id="vol" type="range" min="0" max="1" step="0.05" value="1"></div>
+    <div id="nowPlaying" class="now idle">
+      <div class="label">▶ Now playing
+        <span class="eq" id="eq"><i></i><i></i><i></i><i></i><i></i></span>
+      </div>
+      <div class="np-title" id="npTitle">Nothing playing</div>
+      <div class="np-meta" id="npMeta">Press play to start the queue</div>
+      <span class="statuspill stopped" id="statusPill">stopped</span>
     </div>
 
-    <div class="section-title">Queue</div>
+    <div class="transport">
+      <button class="tbtn main" id="play" title="Play">▶</button>
+      <button class="tbtn" id="pause" title="Pause">⏸</button>
+      <button class="tbtn" id="next" title="Next">⏭</button>
+      <button class="tbtn" id="stop" title="Stop">⏹</button>
+      <div class="vol"><span>🔊</span><input id="vol" type="range" min="0" max="1" step="0.05" value="1"></div>
+    </div>
+
+    <div class="section-title">Queue <span id="qcount" style="margin-left:6px;color:var(--cyan)"></span></div>
     <div id="queue" class="list"></div>
   </div>
 

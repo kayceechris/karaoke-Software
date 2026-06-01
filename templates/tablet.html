@@ -2,25 +2,61 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Request a Song</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Melbourne Karaoke — Request a Song</title>
+  <meta name="theme-color" content="#0a0c1a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Melbourne Karaoke">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/img/icon-192.png">
+  <link rel="icon" href="/static/img/logo.svg">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  <header class="bar">
-    <h1>🎤 Request a Song</h1>
+  <div class="bgblob"></div>
+
+  <header class="appbar">
+    <img class="logo" src="/static/img/logo.png" alt="Melbourne Karaoke"
+         onerror="this.onerror=null;this.src='/static/img/logo.svg'">
+    <div class="brand"><b>Melbourne Karaoke</b><span>Request a song</span></div>
     <div class="spacer"></div>
+    <button id="installBtn" class="btn btn-ghost">⬇ Install</button>
   </header>
 
   <div class="wrap">
-    <div class="searchbar">
+    <!-- Now playing hero -->
+    <div id="nowPlaying" class="now idle">
+      <div class="label">🎤 On stage</div>
+      <div class="np-title" id="npTitle">Welcome to Melbourne Karaoke</div>
+      <div class="np-meta" id="npMeta">Search a song below and add it to the queue</div>
+    </div>
+
+    <div class="search">
+      <span class="ico">🔎</span>
       <input id="q" type="search" placeholder="Search song or artist…" autocomplete="off">
     </div>
 
+    <div class="section-title">Songs</div>
     <div id="results" class="list"></div>
 
     <div class="section-title">Up next</div>
     <div id="queue" class="list"></div>
+  </div>
+
+  <!-- Request modal -->
+  <div class="modal-bg" id="reqModal">
+    <div class="modal">
+      <h3>Add to queue</h3>
+      <div class="song-line" id="reqSongTitle">—</div>
+      <label for="reqSinger">Singer name</label>
+      <input id="reqSinger" type="text" placeholder="Your name" maxlength="40">
+      <div class="actions">
+        <button class="btn btn-ghost" id="reqCancel">Cancel</button>
+        <button class="btn btn-primary" id="reqConfirm">🎶 Request</button>
+      </div>
+    </div>
   </div>
 
   <div id="toast"></div>

@@ -21,7 +21,7 @@ Env vars:
 import os
 from functools import wraps
 
-from flask import (Flask, jsonify, render_template, request, abort)
+from flask import (Flask, jsonify, render_template, request, abort, send_file)
 
 import db
 
@@ -67,6 +67,22 @@ def tablet():
 @app.route("/admin")
 def admin():
     return render_template("admin.html", auth=bool(HOST_TOKEN))
+
+
+# ---- PWA: serve service worker + manifest from root scope ----
+@app.route("/sw.js")
+def sw():
+    resp = send_file(os.path.join(app.static_folder, "sw.js"),
+                     mimetype="application/javascript")
+    resp.headers["Service-Worker-Allowed"] = "/"
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@app.route("/manifest.webmanifest")
+def manifest():
+    return send_file(os.path.join(app.static_folder, "manifest.webmanifest"),
+                     mimetype="application/manifest+json")
 
 
 # --------------------------------------------------------------------------

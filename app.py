@@ -177,6 +177,21 @@ def admin():
     return render_template("admin.html")
 
 
+@app.route("/sw.js")
+def sw():
+    resp = send_file(os.path.join(app.static_folder, "sw.js"),
+                     mimetype="application/javascript")
+    resp.headers["Service-Worker-Allowed"] = "/"
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@app.route("/manifest.webmanifest")
+def manifest():
+    return send_file(os.path.join(app.static_folder, "manifest.webmanifest"),
+                     mimetype="application/manifest+json")
+
+
 @app.route("/player")
 def player():
     return render_template("player.html")
