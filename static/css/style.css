@@ -220,6 +220,33 @@ input[type="search"]:focus, input[type="text"]:focus {
 .statuspill.playing { color: #71ffb0; background: rgba(45, 230, 130, .12); border-color: rgba(45, 230, 130, .3); }
 .statuspill.stopped { color: var(--muted); background: rgba(255, 255, 255, .05); border-color: var(--border); }
 
+/* ---- lyrics card (guest) ---- */
+.lyrics-card {
+  border-radius: 18px; margin-bottom: 8px; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--border);
+  animation: cardIn .4s ease both;
+}
+.lyrics-head {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; background: transparent; border: none; border-radius: 0;
+  color: var(--text); font-weight: 700; font-size: 15px; cursor: pointer;
+}
+.lyrics-head:hover { transform: none; background: var(--panel-strong); }
+.lyrics-head small { flex: 1; text-align: left; color: var(--muted); font-weight: 500; font-size: 12px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lyrics-caret { transition: transform .25s; color: var(--cyan); }
+.lyrics-card.collapsed .lyrics-caret { transform: rotate(-90deg); }
+.lyrics-body {
+  padding: 4px 18px 18px; max-height: 320px; overflow-y: auto;
+  white-space: pre-wrap; line-height: 1.7; color: #dfe3ff; font-size: 15.5px;
+  scrollbar-width: thin; scrollbar-color: var(--violet) transparent;
+}
+.lyrics-card.collapsed .lyrics-body { display: none; }
+.lyrics-body::-webkit-scrollbar { width: 6px; }
+.lyrics-body::-webkit-scrollbar-thumb { background: var(--violet); border-radius: 999px; }
+.lyrics-body .muted { color: var(--muted); font-style: italic; }
+.lyrics-src { display: block; margin-top: 14px; font-size: 11px; color: var(--muted); }
+
 /* ---- admin transport ---- */
 .transport { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 18px 0; }
 .tbtn {

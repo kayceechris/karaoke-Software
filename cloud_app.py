@@ -20,16 +20,20 @@ Env vars:
 
 import io
 import os
+import re
 from functools import wraps
 
 import qrcode
 import qrcode.image.svg
+import requests
 from flask import (Flask, jsonify, render_template, request, abort, send_file,
                    Response)
 
 import db
 
 HOST_TOKEN = os.environ.get("HOST_TOKEN", "")
+LRCLIB_UA = "MelbourneKaraoke/1.0 (+https://karaoke-t33m.onrender.com)"
+_LYRICS_CACHE = {}  # song_id -> result dict (lyrics don't change during an event)
 
 app = Flask(__name__)
 db.init_schema()
@@ -165,6 +169,59 @@ def api_songs():
             "SELECT id, song_key, title, artist, kind FROM songs "
             "ORDER BY artist, title LIMIT 200")
     return jsonify(rows)
+
+
+# --------------------------------------------------------------------------
+# Lyrics (open to guests) — fetched from LRCLIB by title/artist
+# --------------------------------------------------------------------------
+_NOISE = re.compile(
+    r"(?i)\b(karaoke|version|instrumental|lyrics?|official|video|audio|hd|4k|"
+    r"karafun|djpsalmy|remake|cover|remix|male key|female key|higher key|"
+    r"lower key|with backing vocals|no backing vocals|backing vocals|"
+    r"in the style of|made famous by)\b")
+
+
+def _clean_meta(s):
+    s = re.sub(r"\(.*?\)|\[.*?\]", " ", s or "")   # drop (...) and [...]
+    s = _NOISE.sub(" ", s)
+    s = re.sub(r"[^A-Za-z0-9\s]", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+@app.route("/api/lyrics")
+def api_lyrics():
+    song_id = request.args.get("song_id", type=int)
+    if song_id is None:
+        abort(400)
+    if song_id in _LYRICS_CACHE:
+        return jsonify(_LYRICS_CACHE[song_id])
+
+    row = db.fetchone("SELECT title, artist FROM songs WHERE id=?", (song_id,))
+    if not row:
+        abort(404)
+
+    query = (_clean_meta(row["artist"]) + " " + _clean_meta(row["title"])).strip()
+    result = {"found": False, "query": query}
+    if query:
+        try:
+            r = requests.get("https://lrclib.net/api/search",
+                             params={"q": query},
+                             headers={"User-Agent": LRCLIB_UA}, timeout=12)
+            if r.ok:
+                best = next((d for d in r.json() if d.get("plainLyrics")), None)
+                if best:
+                    result = {
+                        "found": True,
+                        "plain": best["plainLyrics"],
+                        "synced": best.get("syncedLyrics") or "",
+                        "name": f"{best.get('artistName', '')} — {best.get('trackName', '')}".strip(" —"),
+                        "source": "LRCLIB",
+                    }
+        except requests.RequestException:
+            pass
+
+    _LYRICS_CACHE[song_id] = result
+    return jsonify(result)
 
 
 # --------------------------------------------------------------------------

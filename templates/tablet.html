@@ -33,6 +33,16 @@
       <div class="np-meta" id="npMeta">Search a song below and add it to the queue</div>
     </div>
 
+    <!-- Lyrics for the now-playing song -->
+    <div id="lyricsCard" class="lyrics-card" style="display:none">
+      <button class="lyrics-head" id="lyricsToggle">
+        <span>📜 Lyrics</span>
+        <small id="lyricsName"></small>
+        <span class="lyrics-caret" id="lyricsCaret">▾</span>
+      </button>
+      <div id="lyricsBody" class="lyrics-body"></div>
+    </div>
+
     <div class="search">
       <span class="ico">🔎</span>
       <input id="q" type="search" placeholder="Search song or artist…" autocomplete="off">

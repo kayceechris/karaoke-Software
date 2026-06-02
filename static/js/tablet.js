@@ -11,8 +11,16 @@ const reqSinger = document.getElementById("reqSinger");
 const reqConfirm = document.getElementById("reqConfirm");
 const reqCancel = document.getElementById("reqCancel");
 
+const lyricsCard = document.getElementById("lyricsCard");
+const lyricsBody = document.getElementById("lyricsBody");
+const lyricsName = document.getElementById("lyricsName");
+const lyricsToggle = document.getElementById("lyricsToggle");
+
 let searchTimer = null;
 let pendingSong = null;
+let lastLyricSongId = null;
+
+lyricsToggle.onclick = () => lyricsCard.classList.toggle("collapsed");
 
 function stagger(container) {
   [...container.children].forEach((c, i) => {
@@ -114,10 +122,47 @@ async function loadNow() {
     npMeta.innerHTML =
       (st.current.artist || "Unknown") +
       ' · <span class="singer">🎤 ' + st.current.singer + "</span>";
+    // Fetch lyrics once per song change.
+    if (st.current.song_id !== lastLyricSongId) {
+      lastLyricSongId = st.current.song_id;
+      loadLyrics(st.current.song_id);
+    }
   } else {
     nowEl.classList.add("idle");
     npTitle.textContent = "Welcome to Melbourne Karaoke";
     npMeta.textContent = "Search a song below and add it to the queue";
+    lastLyricSongId = null;
+    lyricsCard.style.display = "none";
+  }
+}
+
+async function loadLyrics(songId) {
+  lyricsCard.style.display = "";
+  lyricsCard.classList.remove("collapsed");
+  lyricsName.textContent = "loading…";
+  lyricsBody.innerHTML = '<span class="muted">Finding lyrics…</span>';
+  let res;
+  try {
+    res = await api("/api/lyrics?song_id=" + songId);
+  } catch (e) {
+    lyricsBody.innerHTML = '<span class="muted">Lyrics unavailable right now.</span>';
+    lyricsName.textContent = "";
+    return;
+  }
+  if (lastLyricSongId !== songId) return;   // song changed while loading
+  if (res.found) {
+    lyricsName.textContent = res.name || "";
+    lyricsBody.textContent = res.plain;
+    const src = document.createElement("span");
+    src.className = "lyrics-src";
+    src.textContent = "Lyrics via " + (res.source || "LRCLIB") +
+      " · timing may differ from the karaoke track";
+    lyricsBody.appendChild(src);
+    lyricsBody.scrollTop = 0;
+  } else {
+    lyricsName.textContent = "";
+    lyricsBody.innerHTML =
+      '<span class="muted">No lyrics found for this track — follow the screen! 🎤</span>';
   }
 }
 
