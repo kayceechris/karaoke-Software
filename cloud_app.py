@@ -159,10 +159,13 @@ def api_catalog():
 def api_songs():
     q = request.args.get("q", "").strip()
     if q:
-        like = f"%{q}%"
+        # LOWER() both sides so search is case-insensitive on Postgres too
+        # (Postgres LIKE is case-sensitive; SQLite's is not).
+        like = f"%{q.lower()}%"
         rows = db.fetchall(
             "SELECT id, song_key, title, artist, kind FROM songs "
-            "WHERE title LIKE ? OR artist LIKE ? ORDER BY artist, title LIMIT 200",
+            "WHERE LOWER(title) LIKE ? OR LOWER(artist) LIKE ? "
+            "ORDER BY artist, title LIMIT 200",
             (like, like))
     else:
         rows = db.fetchall(
