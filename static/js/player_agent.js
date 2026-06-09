@@ -18,6 +18,7 @@ let currentQueueId = null;
 let currentKind = null;
 let volume = 1.0;
 let cdgActive = false;
+let songEnded = false;
 
 tapstart.addEventListener("click", async () => {
   unlocked = true;
@@ -46,6 +47,7 @@ function showOverlay(it) {
 }
 
 function onEnded() {
+  songEnded = true;
   fetch("/api/ended", { method: "POST" }).catch(() => {});
 }
 
@@ -53,6 +55,7 @@ async function loadSong(it) {
   currentQueueId = it.queue_id;
   currentKind = it.kind;
   cdgActive = false;
+  songEnded = false;
   idle.style.display = "none";
   video.pause(); audio.pause();
   video.removeAttribute("src"); video.load();
@@ -109,7 +112,7 @@ async function poll() {
     if (state.current.queue_id !== currentQueueId) { await loadSong(state.current); return; }
 
     const m = activeMedia();
-    if (state.status === "playing" && m.paused && unlocked) m.play().catch(() => {});
+    if (state.status === "playing" && m.paused && unlocked && !songEnded) m.play().catch(() => {});
     else if (state.status === "paused" && !m.paused) m.pause();
     else if (state.status === "stopped") m.pause();
   } finally {

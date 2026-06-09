@@ -14,6 +14,7 @@ let currentQueueId = null;
 let currentKind = null;
 let volume = 1.0;
 let cdgActive = false;
+let songEnded = false;
 
 // Browsers block autoplay until a user gesture. One tap unlocks both elements.
 tapstart.addEventListener("click", async () => {
@@ -38,6 +39,7 @@ function showOverlay(it) {
 }
 
 function onEnded() {
+  songEnded = true;
   api("/api/player/ended", { method: "POST" }).catch(() => {});
 }
 
@@ -45,6 +47,7 @@ async function loadSong(it) {
   currentQueueId = it.queue_id;
   currentKind = it.kind;
   cdgActive = false;
+  songEnded = false;
   idle.style.display = "none";
 
   // stop whatever was running
@@ -112,7 +115,7 @@ async function poll() {
 
   // same song -> reconcile play/pause
   const m = activeMedia();
-  if (state.status === "playing" && m.paused && unlocked) {
+  if (state.status === "playing" && m.paused && unlocked && !songEnded) {
     m.play().catch(() => {});
   } else if (state.status === "paused" && !m.paused) {
     m.pause();
