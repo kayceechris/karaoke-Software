@@ -277,6 +277,16 @@ def api_lyrics():
                     if best:
                         result = _lrclib_result(best)
 
+            # Strategy 4: title-only search (catches artist name mismatches)
+            if not result["found"] and title:
+                r = requests.get("https://lrclib.net/api/search",
+                                 params={"track_name": title},
+                                 headers={"User-Agent": LRCLIB_UA}, timeout=12)
+                if r.ok:
+                    best = next((d for d in r.json() if d.get("plainLyrics")), None)
+                    if best:
+                        result = _lrclib_result(best)
+
         except requests.RequestException:
             pass
 
