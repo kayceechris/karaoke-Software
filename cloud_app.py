@@ -179,7 +179,7 @@ def api_songs():
 # --------------------------------------------------------------------------
 _NOISE = re.compile(
     r"(?i)\b(karaoke|version|instrumental|lyrics?|official|video|audio|hd|4k|"
-    r"karafun|djpsalmy|remake|cover|remix|male key|female key|higher key|"
+    r"karafun|djpsalmy|mcpsalmy|psalmy|remake|cover|remix|male key|female key|higher key|"
     r"lower key|with backing vocals|no backing vocals|backing vocals|"
     r"in the style of|made famous by)\b")
 
