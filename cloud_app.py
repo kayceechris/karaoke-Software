@@ -191,6 +191,16 @@ def _clean_meta(s):
     return re.sub(r"\s+", " ", s).strip()
 
 
+def _lrclib_result(d):
+    return {
+        "found": True,
+        "plain": d["plainLyrics"],
+        "synced": d.get("syncedLyrics") or "",
+        "name": f"{d.get('artistName', '')} — {d.get('trackName', '')}".strip(" —"),
+        "source": "LRCLIB",
+    }
+
+
 @app.route("/api/lyrics")
 def api_lyrics():
     song_id = request.args.get("song_id", type=int)
@@ -203,23 +213,48 @@ def api_lyrics():
     if not row:
         abort(404)
 
-    query = (_clean_meta(row["artist"]) + " " + _clean_meta(row["title"])).strip()
-    result = {"found": False, "query": query}
-    if query:
+    title = _clean_meta(row["title"])
+    artist = _clean_meta(row["artist"])
+    result = {"found": False}
+
+    if title:
         try:
-            r = requests.get("https://lrclib.net/api/search",
-                             params={"q": query},
+            # Strategy 1: exact lookup by track + artist (most accurate)
+            params1 = {"track_name": title}
+            if artist:
+                params1["artist_name"] = artist
+            r = requests.get("https://lrclib.net/api/get",
+                             params=params1,
                              headers={"User-Agent": LRCLIB_UA}, timeout=12)
-            if r.ok:
-                best = next((d for d in r.json() if d.get("plainLyrics")), None)
-                if best:
-                    result = {
-                        "found": True,
-                        "plain": best["plainLyrics"],
-                        "synced": best.get("syncedLyrics") or "",
-                        "name": f"{best.get('artistName', '')} — {best.get('trackName', '')}".strip(" —"),
-                        "source": "LRCLIB",
-                    }
+            if r.status_code == 200:
+                d = r.json()
+                if d.get("plainLyrics"):
+                    result = _lrclib_result(d)
+
+            # Strategy 2: structured search with separate track/artist params
+            if not result["found"]:
+                params2 = {"track_name": title}
+                if artist:
+                    params2["artist_name"] = artist
+                r = requests.get("https://lrclib.net/api/search",
+                                 params=params2,
+                                 headers={"User-Agent": LRCLIB_UA}, timeout=12)
+                if r.ok:
+                    best = next((d for d in r.json() if d.get("plainLyrics")), None)
+                    if best:
+                        result = _lrclib_result(best)
+
+            # Strategy 3: fallback combined free-text query
+            if not result["found"]:
+                query = (artist + " " + title).strip()
+                r = requests.get("https://lrclib.net/api/search",
+                                 params={"q": query},
+                                 headers={"User-Agent": LRCLIB_UA}, timeout=12)
+                if r.ok:
+                    best = next((d for d in r.json() if d.get("plainLyrics")), None)
+                    if best:
+                        result = _lrclib_result(best)
+
         except requests.RequestException:
             pass
 
