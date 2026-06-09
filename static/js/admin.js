@@ -5,6 +5,30 @@ const npMeta = document.getElementById("npMeta");
 const statusPill = document.getElementById("statusPill");
 const qcount = document.getElementById("qcount");
 const volEl = document.getElementById("vol");
+const seekEl = document.getElementById("seek");
+const seekTimeEl = document.getElementById("seekTime");
+
+let _dur = 0, _pos = 0, _dragging = false, _ticker = null;
+
+function fmt(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+seekEl.addEventListener("mousedown",  () => { _dragging = true; });
+seekEl.addEventListener("touchstart", () => { _dragging = true; }, { passive: true });
+seekEl.addEventListener("input", () => {
+  if (!_dur) return;
+  const p = (parseFloat(seekEl.value) / 100) * _dur;
+  seekTimeEl.textContent = fmt(p) + " / " + fmt(_dur);
+});
+seekEl.addEventListener("change", () => {
+  _dragging = false;
+  if (!_dur) return;
+  cmd("seek", (parseFloat(seekEl.value) / 100) * _dur);
+});
+seekEl.addEventListener("mouseup",  () => { _dragging = false; });
+seekEl.addEventListener("touchend", () => { _dragging = false; });
 
 // Hybrid/cloud mode: admin actions need the host token. Ask once, store it.
 if (window.NEEDS_AUTH && !localStorage.getItem("host_token")) {
@@ -54,6 +78,24 @@ function setNow(state) {
   statusPill.textContent = state.status;
   statusPill.className = "statuspill " + state.status;
   nowEl.classList.toggle("paused", state.status !== "playing");
+
+  // Seek bar
+  if (!_dragging) {
+    _dur = state.duration || 0;
+    _pos = state.position || 0;
+    seekEl.disabled = !c || !_dur;
+    seekEl.value = _dur ? (_pos / _dur) * 100 : 0;
+    seekTimeEl.textContent = fmt(_pos) + " / " + fmt(_dur);
+  }
+  clearInterval(_ticker);
+  if (state.status === "playing" && c && _dur) {
+    _ticker = setInterval(() => {
+      if (_dragging) return;
+      _pos = Math.min(_pos + 1, _dur);
+      seekEl.value = (_pos / _dur) * 100;
+      seekTimeEl.textContent = fmt(_pos) + " / " + fmt(_dur);
+    }, 1000);
+  }
 }
 
 async function refresh() {

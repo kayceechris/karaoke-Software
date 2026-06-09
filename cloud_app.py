@@ -377,9 +377,13 @@ def _advance(cur):
 
 @app.route("/api/player/state")
 def api_player_state():
-    st = db.fetchone("SELECT status, volume, seq FROM player_state WHERE id=1")
+    st = db.fetchone(
+        "SELECT status, volume, seq, position, duration, seek_to FROM player_state WHERE id=1")
     cur = current_playing()
     return jsonify(status=st["status"], volume=st["volume"], seq=st["seq"],
+                   position=st.get("position") or 0,
+                   duration=st.get("duration") or 0,
+                   seek_to=st.get("seek_to"),
                    current=cur)
 
 
@@ -409,6 +413,8 @@ def api_player_command():
         elif action == "volume":
             vol = max(0.0, min(1.0, float(value)))
             db.x(cur, "UPDATE player_state SET volume=? WHERE id=1", (vol,))
+        elif action == "seek":
+            db.x(cur, "UPDATE player_state SET seek_to=? WHERE id=1", (float(value),))
         else:
             abort(400)
         db.x(cur, "UPDATE player_state SET seq = seq + 1 WHERE id=1")
@@ -420,7 +426,29 @@ def api_player_command():
 def api_player_ended():
     with db.transaction() as cur:
         _advance(cur)
-        db.x(cur, "UPDATE player_state SET seq = seq + 1 WHERE id=1")
+        db.x(cur, "UPDATE player_state SET seq = seq + 1, position=0, duration=0 WHERE id=1")
+    return jsonify(ok=True)
+
+
+@app.route("/api/player/position", methods=["POST"])
+@require_host
+def api_player_position():
+    data = request.get_json(force=True)
+    pos = float(data.get("position", 0))
+    dur = float(data.get("duration", 0))
+    with db.transaction() as cur:
+        db.x(cur, "SELECT seek_to FROM player_state WHERE id=1")
+        row = cur.fetchone()
+        seek_to = (dict(row).get("seek_to") if row else None)
+        db.x(cur, "UPDATE player_state SET position=?, duration=?, seek_to=NULL WHERE id=1",
+             (pos, dur))
+    return jsonify(seek_to=seek_to)
+
+
+@app.route("/api/player/seeked", methods=["POST"])
+@require_host
+def api_player_seeked():
+    db.execute("UPDATE player_state SET seek_to=NULL WHERE id=1")
     return jsonify(ok=True)
 
 

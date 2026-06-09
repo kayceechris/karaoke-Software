@@ -123,3 +123,15 @@ def init_schema():
         if not cur.fetchone():
             x(cur, "INSERT INTO player_state (id, status, volume, seq) "
                    "VALUES (1, 'stopped', 1.0, 0)")
+
+    # Column migrations — each in its own transaction so a pre-existing
+    # column doesn't roll back the others.
+    for _col in [
+        "ALTER TABLE player_state ADD COLUMN position REAL NOT NULL DEFAULT 0",
+        "ALTER TABLE player_state ADD COLUMN duration REAL NOT NULL DEFAULT 0",
+        "ALTER TABLE player_state ADD COLUMN seek_to  REAL",
+    ]:
+        try:
+            execute(_col)
+        except Exception:
+            pass  # column already exists

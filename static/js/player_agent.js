@@ -51,6 +51,18 @@ function onEnded() {
   fetch("/api/ended", { method: "POST" }).catch(() => {});
 }
 
+function reportPosition() {
+  if (!currentQueueId) return;
+  const m = activeMedia();
+  if (!m || !isFinite(m.duration) || m.duration === 0) return;
+  fetch("/api/position", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ position: m.currentTime, duration: m.duration }),
+  }).catch(() => {});
+}
+setInterval(reportPosition, 3000);
+
 async function loadSong(it) {
   currentQueueId = it.queue_id;
   currentKind = it.kind;
@@ -110,6 +122,11 @@ async function poll() {
       return;
     }
     if (state.current.queue_id !== currentQueueId) { await loadSong(state.current); return; }
+
+    if (state.seek_to != null) {
+      activeMedia().currentTime = state.seek_to;
+      fetch("/api/seeked", { method: "POST" }).catch(() => {});
+    }
 
     const m = activeMedia();
     if (state.status === "playing" && m.paused && unlocked && !songEnded) m.play().catch(() => {});

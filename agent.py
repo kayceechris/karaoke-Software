@@ -141,6 +141,16 @@ def api_ended():
     return jsonify(cloud_post("/api/player/ended"))
 
 
+@app.route("/api/position", methods=["POST"])
+def api_position():
+    return jsonify(cloud_post("/api/player/position", request.get_json(force=True)))
+
+
+@app.route("/api/seeked", methods=["POST"])
+def api_seeked():
+    return jsonify(cloud_post("/api/player/seeked"))
+
+
 @app.route("/api/resync", methods=["POST"])
 def api_resync():
     return jsonify(ok=True, count=push_catalog())
