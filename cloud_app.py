@@ -188,7 +188,10 @@ _FEAT_RE = re.compile(r"(?i)\s+(?:ft\.?|feat\.?|featuring)\s+.+$")
 
 # Artist fields that are karaoke publisher labels, not real artists
 _KARAOKE_LABEL = re.compile(
-    r"(?i)\b(karaoke|studio|gap|karafun|djpsalmy|backing|instrumental)\b")
+    r"(?i)\b(karaoke|studio|gap|karafun|djpsalmy|mcpsalmy|psalmy|backing|instrumental)\b")
+
+# Title field contains "karaoke" → the filename was stored Song-first, Artist-last
+_KARAOKE_IN_TITLE = re.compile(r"(?i)\bkaraoke\b")
 
 
 def _clean_meta(s):
@@ -200,15 +203,29 @@ def _clean_meta(s):
 
 
 def _real_artist_title(raw_title, raw_artist):
-    """When the stored artist is a karaoke label, the title often embeds
-    the real artist as 'Artist - Title' or 'Artist -Title'. Split it out."""
+    """Recover real artist + title from karaoke file metadata.
+
+    Case 1 – stored artist is a publisher label AND title embeds "Artist - Title":
+      e.g. artist="Gap Karaoke", title="Asake -Terminator (Karaoke Version)"
+      → title="Terminator", artist="Asake"
+
+    Case 2 – title contains the word 'karaoke' (file was named "Song - Artist karaoke"):
+      e.g. title="R. Kelly karaoke", artist="Ignition (Remix)"
+      → swap: title="Ignition (Remix)", artist="R. Kelly karaoke"
+         _clean_meta then strips 'karaoke' leaving artist="R Kelly"
+    """
     if not raw_artist or _KARAOKE_LABEL.search(raw_artist):
-        # Strip parens first so they don't confuse the split
         base = re.sub(r"\(.*?\)|\[.*?\]", " ", raw_title or "").strip()
-        # Match "Artist - Title" or "Artist -Title" (no space after dash)
         m = re.match(r"^(.+?)\s+-\s*(.+)$", base)
         if m:
-            return m.group(1).strip(), m.group(2).strip()
+            # group(1)=Artist portion, group(2)=Title portion → return (title, artist)
+            return m.group(2).strip(), m.group(1).strip()
+
+    if _KARAOKE_IN_TITLE.search(raw_title or ""):
+        # File named "Song - Artist karaoke": stored title is really the artist label,
+        # stored artist is really the song title — swap them.
+        return raw_artist, raw_title
+
     return raw_title, raw_artist
 
 
