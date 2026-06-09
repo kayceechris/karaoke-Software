@@ -183,12 +183,29 @@ _NOISE = re.compile(
     r"lower key|with backing vocals|no backing vocals|backing vocals|"
     r"in the style of|made famous by)\b")
 
+# Artist fields that are karaoke publisher labels, not real artists
+_KARAOKE_LABEL = re.compile(
+    r"(?i)\b(karaoke|studio|gap|karafun|djpsalmy|backing|instrumental)\b")
+
 
 def _clean_meta(s):
     s = re.sub(r"\(.*?\)|\[.*?\]", " ", s or "")   # drop (...) and [...]
     s = _NOISE.sub(" ", s)
     s = re.sub(r"[^A-Za-z0-9\s]", " ", s)
     return re.sub(r"\s+", " ", s).strip()
+
+
+def _real_artist_title(raw_title, raw_artist):
+    """When the stored artist is a karaoke label, the title often embeds
+    the real artist as 'Artist - Title' or 'Artist -Title'. Split it out."""
+    if not raw_artist or _KARAOKE_LABEL.search(raw_artist):
+        # Strip parens first so they don't confuse the split
+        base = re.sub(r"\(.*?\)|\[.*?\]", " ", raw_title or "").strip()
+        # Match "Artist - Title" or "Artist -Title" (no space after dash)
+        m = re.match(r"^(.+?)\s+-\s*(.+)$", base)
+        if m:
+            return m.group(1).strip(), m.group(2).strip()
+    return raw_title, raw_artist
 
 
 def _lrclib_result(d):
@@ -213,8 +230,9 @@ def api_lyrics():
     if not row:
         abort(404)
 
-    title = _clean_meta(row["title"])
-    artist = _clean_meta(row["artist"])
+    raw_title, raw_artist = _real_artist_title(row["title"], row["artist"])
+    title = _clean_meta(raw_title)
+    artist = _clean_meta(raw_artist)
     result = {"found": False}
 
     if title:
