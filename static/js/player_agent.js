@@ -69,23 +69,29 @@ async function loadSong(it) {
   cdgActive = false;
   songEnded = false;
   idle.style.display = "none";
-  video.pause(); audio.pause();
-  video.removeAttribute("src"); video.load();
 
   if (it.kind === "video") {
-    video.style.display = ""; canvas.style.display = "none";
-    video.src = mediaUrl(it.song_key, false);
+    // Pause and release audio so it doesn't keep buffering in background
+    audio.pause(); audio.removeAttribute("src");
+    canvas.style.display = "none";
+    video.style.display = "";
+    video.pause();
+    video.src = mediaUrl(it.song_key, false);   // browser aborts old + starts new immediately
     video.volume = volume;
     video.onended = onEnded;
     if (unlocked) video.play().catch(() => {});
   } else {
+    // Pause and release video
+    video.pause(); video.removeAttribute("src");
     video.style.display = "none";
-    audio.src = mediaUrl(it.song_key, false);
+    audio.pause();
+    audio.src = mediaUrl(it.song_key, false);   // start buffering audio right away
     audio.volume = volume;
     audio.onended = onEnded;
     if (it.kind === "cdg") {
       canvas.style.display = "";
       try {
+        // CDG fetch and audio buffer run in parallel
         const buf = await fetch(mediaUrl(it.song_key, true)).then(r => r.arrayBuffer());
         await cdg.load(buf);
         cdgActive = true;

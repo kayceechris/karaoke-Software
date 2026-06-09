@@ -370,9 +370,9 @@ def _advance(cur):
     nxt = cur.fetchone()
     if nxt:
         db.x(cur, "UPDATE queue SET status='playing' WHERE id=?", (nxt["id"],))
-        db.x(cur, "UPDATE player_state SET status='playing' WHERE id=1")
+        db.x(cur, "UPDATE player_state SET status='playing', seek_to=NULL WHERE id=1")
     else:
-        db.x(cur, "UPDATE player_state SET status='stopped' WHERE id=1")
+        db.x(cur, "UPDATE player_state SET status='stopped', seek_to=NULL WHERE id=1")
 
 
 @app.route("/api/player/state")
@@ -436,13 +436,8 @@ def api_player_position():
     data = request.get_json(force=True)
     pos = float(data.get("position", 0))
     dur = float(data.get("duration", 0))
-    with db.transaction() as cur:
-        db.x(cur, "SELECT seek_to FROM player_state WHERE id=1")
-        row = cur.fetchone()
-        seek_to = (dict(row).get("seek_to") if row else None)
-        db.x(cur, "UPDATE player_state SET position=?, duration=?, seek_to=NULL WHERE id=1",
-             (pos, dur))
-    return jsonify(seek_to=seek_to)
+    db.execute("UPDATE player_state SET position=?, duration=? WHERE id=1", (pos, dur))
+    return jsonify(ok=True)
 
 
 @app.route("/api/player/seeked", methods=["POST"])
