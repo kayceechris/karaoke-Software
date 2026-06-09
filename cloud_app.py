@@ -183,6 +183,9 @@ _NOISE = re.compile(
     r"lower key|with backing vocals|no backing vocals|backing vocals|"
     r"in the style of|made famous by)\b")
 
+# Strip "ft. Artist", "feat. Artist", "featuring Artist" suffix from titles
+_FEAT_RE = re.compile(r"(?i)\s+(?:ft\.?|feat\.?|featuring)\s+.+$")
+
 # Artist fields that are karaoke publisher labels, not real artists
 _KARAOKE_LABEL = re.compile(
     r"(?i)\b(karaoke|studio|gap|karafun|djpsalmy|backing|instrumental)\b")
@@ -190,6 +193,7 @@ _KARAOKE_LABEL = re.compile(
 
 def _clean_meta(s):
     s = re.sub(r"\(.*?\)|\[.*?\]", " ", s or "")   # drop (...) and [...]
+    s = _FEAT_RE.sub("", s)                          # drop "ft./feat. ..." suffix
     s = _NOISE.sub(" ", s)
     s = re.sub(r"[^A-Za-z0-9\s]", " ", s)
     return re.sub(r"\s+", " ", s).strip()
