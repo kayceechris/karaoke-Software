@@ -114,7 +114,7 @@ async function poll() {
     let state;
     try {
       const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 8000);
+      const tid = setTimeout(() => ctrl.abort(), 3000);
       try { state = await fetch("/api/state", { signal: ctrl.signal }).then(r => r.json()); }
       finally { clearTimeout(tid); }
     } catch (e) { return; }

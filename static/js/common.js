@@ -11,7 +11,7 @@ function toast(msg) {
 async function api(url, opts) {
   opts = opts || {};
   const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 9000);
+  const tid = setTimeout(() => ctrl.abort(), 4000);
   opts = { signal: ctrl.signal, ...opts };
   const token = localStorage.getItem("host_token");
   if (token) {
