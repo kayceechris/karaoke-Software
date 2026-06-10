@@ -112,8 +112,12 @@ async function poll() {
   polling = true;
   try {
     let state;
-    try { state = await fetch("/api/state").then(r => r.json()); }
-    catch (e) { return; }
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 8000);
+      try { state = await fetch("/api/state", { signal: ctrl.signal }).then(r => r.json()); }
+      finally { clearTimeout(tid); }
+    } catch (e) { return; }
     // Skip ticks where the cloud was unreachable or the reply is malformed —
     // keep playing the current song instead of resetting it.
     if (!state || state.unavailable || typeof state.status === "undefined") return;

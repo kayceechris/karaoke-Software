@@ -102,13 +102,13 @@ def push_catalog():
 # Cloud proxy (browser talks only to the agent; agent talks to the cloud)
 # --------------------------------------------------------------------------
 def cloud_get(path):
-    r = requests.get(f"{CLOUD_URL}{path}", timeout=15)
+    r = requests.get(f"{CLOUD_URL}{path}", timeout=8)
     return r.json()
 
 
 def cloud_post(path, payload=None):
     r = requests.post(f"{CLOUD_URL}{path}", json=payload or {},
-                      headers={"X-Host-Token": HOST_TOKEN}, timeout=15)
+                      headers={"X-Host-Token": HOST_TOKEN}, timeout=8)
     return r.json()
 
 

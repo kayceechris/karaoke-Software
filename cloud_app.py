@@ -432,6 +432,8 @@ def api_player_command():
             db.x(cur, "UPDATE player_state SET volume=? WHERE id=1", (vol,))
         elif action == "seek":
             db.x(cur, "UPDATE player_state SET seek_to=? WHERE id=1", (float(value),))
+        elif action == "restart":
+            db.x(cur, "UPDATE player_state SET seek_to=0, status='playing' WHERE id=1")
         else:
             abort(400)
         db.x(cur, "UPDATE player_state SET seq = seq + 1 WHERE id=1")

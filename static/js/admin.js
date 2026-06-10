@@ -49,6 +49,7 @@ async function cmd(action, value) {
 
 document.getElementById("play").onclick = () => cmd("play");
 document.getElementById("pause").onclick = () => cmd("pause");
+document.getElementById("restart").onclick = () => cmd("restart");
 document.getElementById("next").onclick = () => cmd("next");
 document.getElementById("stop").onclick = () => cmd("stop");
 volEl.oninput = () => cmd("volume", parseFloat(volEl.value));
