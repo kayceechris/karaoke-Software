@@ -103,14 +103,43 @@ def push_catalog():
     return len(catalog)
 
 
+def fetch_queue_priority():
+    """song_keys currently waiting/playing on the cloud, so the sync can jump
+    the line for whatever's actually queued right now instead of grinding
+    through the whole library in folder order first."""
+    if not CLOUD_URL:
+        return set()
+    try:
+        r = requests.get(f"{CLOUD_URL}/api/queue", timeout=4)
+        r.raise_for_status()
+        return {item["song_key"] for item in r.json()}
+    except (requests.RequestException, ValueError, KeyError):
+        return set()
+
+
 def sync_media_to_r2():
     """Mirror local song files to R2 so the cloud /tablet can stream them
     directly to guests. Runs in a background thread — safe to re-run (skips
     files already uploaded), so it's called on every startup/resync and only
-    does real work for songs that are new since the last sync."""
-    todo = list(LOCAL_MAP.items())
+    does real work for songs that are new since the last sync.
+
+    Currently-queued songs upload first; priority is re-checked every few
+    files so a song queued mid-sync jumps ahead of the rest of a large
+    library instead of waiting behind it."""
+    remaining = list(LOCAL_MAP.items())
     uploaded = skipped = failed = 0
-    for key, entry in todo:
+    priority = fetch_queue_priority()
+    since_refresh = 0
+
+    while remaining:
+        if since_refresh >= 5:
+            priority = fetch_queue_priority()
+            since_refresh = 0
+        if priority:
+            remaining.sort(key=lambda kv: kv[0] not in priority)
+        key, entry = remaining.pop(0)
+        since_refresh += 1
+
         try:
             if r2_storage.object_exists(key):
                 skipped += 1
