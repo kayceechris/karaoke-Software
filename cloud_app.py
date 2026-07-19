@@ -22,16 +22,18 @@ import io
 import os
 import re
 from functools import wraps
+from urllib.parse import quote
 
 import qrcode
 import qrcode.image.svg
 import requests
 from flask import (Flask, jsonify, render_template, request, abort, send_file,
-                   Response)
+                   Response, redirect)
 
 import db
 
 HOST_TOKEN = os.environ.get("HOST_TOKEN", "")
+R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL", "").rstrip("/")
 LRCLIB_UA = "MelbourneKaraoke/1.0 (+https://karaoke-t33m.onrender.com)"
 _LYRICS_CACHE = {}  # song_id -> result dict (lyrics don't change during an event)
 
@@ -148,7 +150,8 @@ def api_catalog():
             ph = ",".join(["?"] * len(keys))
             db.x(cur,
                  f"DELETE FROM songs WHERE song_key NOT IN ({ph}) "
-                 f"AND id NOT IN (SELECT song_id FROM queue)", keys)
+                 f"AND id NOT IN (SELECT song_id FROM queue "
+                 f"WHERE status IN ('waiting','playing'))", keys)
     return jsonify(ok=True, count=len(keys))
 
 
@@ -172,6 +175,31 @@ def api_songs():
             "SELECT id, song_key, title, artist, kind FROM songs "
             "ORDER BY artist, title LIMIT 200")
     return jsonify(rows)
+
+
+# --------------------------------------------------------------------------
+# Media (open to guests) — redirects to the song's public R2 URL. The agent
+# uploads files to R2 ahead of time; the cloud never stores or proxies bytes.
+# --------------------------------------------------------------------------
+@app.route("/media/<int:song_id>")
+def media(song_id):
+    if not R2_PUBLIC_BASE_URL:
+        abort(404)
+    row = db.fetchone("SELECT song_key FROM songs WHERE id=?", (song_id,))
+    if not row:
+        abort(404)
+    return redirect(f"{R2_PUBLIC_BASE_URL}/{quote(row['song_key'], safe='/')}")
+
+
+@app.route("/media/<int:song_id>/cdg")
+def media_cdg(song_id):
+    if not R2_PUBLIC_BASE_URL:
+        abort(404)
+    row = db.fetchone("SELECT song_key, kind FROM songs WHERE id=?", (song_id,))
+    if not row or row["kind"] != "cdg":
+        abort(404)
+    cdg_key = os.path.splitext(row["song_key"])[0] + ".cdg"
+    return redirect(f"{R2_PUBLIC_BASE_URL}/{quote(cdg_key, safe='/')}")
 
 
 # --------------------------------------------------------------------------
@@ -255,6 +283,7 @@ def api_lyrics():
     title = _clean_meta(raw_title)
     artist = _clean_meta(raw_artist)
     result = {"found": False}
+    cacheable = True  # don't cache a transient network failure as "not found"
 
     if title:
         try:
@@ -305,9 +334,10 @@ def api_lyrics():
                         result = _lrclib_result(best)
 
         except requests.RequestException:
-            pass
+            cacheable = False  # network hiccup — allow a retry on the next request
 
-    _LYRICS_CACHE[song_id] = result
+    if cacheable:
+        _LYRICS_CACHE[song_id] = result
     return jsonify(result)
 
 
@@ -387,9 +417,11 @@ def _advance(cur):
     nxt = cur.fetchone()
     if nxt:
         db.x(cur, "UPDATE queue SET status='playing' WHERE id=?", (nxt["id"],))
-        db.x(cur, "UPDATE player_state SET status='playing', seek_to=NULL WHERE id=1")
+        db.x(cur, "UPDATE player_state SET status='playing', seek_to=NULL, "
+                  "position=0, duration=0 WHERE id=1")
     else:
-        db.x(cur, "UPDATE player_state SET status='stopped', seek_to=NULL WHERE id=1")
+        db.x(cur, "UPDATE player_state SET status='stopped', seek_to=NULL, "
+                  "position=0, duration=0 WHERE id=1")
 
 
 @app.route("/api/player/state")
@@ -407,8 +439,9 @@ def api_player_state():
 @app.route("/api/player/command", methods=["POST"])
 @require_host
 def api_player_command():
-    action = request.get_json(force=True).get("action")
-    value = request.get_json(force=True).get("value", 1.0)
+    data = request.get_json(force=True)
+    action = data.get("action")
+    value = data.get("value", 1.0)
     with db.transaction() as cur:
         if action == "play":
             if not current_playing(cur):
@@ -428,10 +461,17 @@ def api_player_command():
             db.x(cur, "UPDATE queue SET status='done' WHERE status='playing'")
             db.x(cur, "UPDATE player_state SET status='stopped' WHERE id=1")
         elif action == "volume":
-            vol = max(0.0, min(1.0, float(value)))
+            try:
+                vol = max(0.0, min(1.0, float(value)))
+            except (TypeError, ValueError):
+                abort(400)
             db.x(cur, "UPDATE player_state SET volume=? WHERE id=1", (vol,))
         elif action == "seek":
-            db.x(cur, "UPDATE player_state SET seek_to=? WHERE id=1", (float(value),))
+            try:
+                seek_to = float(value)
+            except (TypeError, ValueError):
+                abort(400)
+            db.x(cur, "UPDATE player_state SET seek_to=? WHERE id=1", (seek_to,))
         elif action == "restart":
             db.x(cur, "UPDATE player_state SET seek_to=0, status='playing' WHERE id=1")
         else:

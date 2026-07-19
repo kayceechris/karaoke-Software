@@ -21,10 +21,13 @@ Run:  python agent.py
 
 import os
 import socket
+import threading
 
 import requests
 from flask import (Flask, jsonify, render_template, request, send_file,
                    abort, Response)
+
+import r2_storage
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SONGS_DIR = os.environ.get("KARAOKE_SONGS_DIR", os.path.join(BASE_DIR, "songs"))
@@ -95,7 +98,44 @@ def push_catalog():
         print(f"  Uploaded {len(catalog)} songs to {CLOUD_URL}")
     except requests.RequestException as e:
         print(f"  [error] catalog upload failed: {e}")
+    if r2_storage.ENABLED:
+        threading.Thread(target=sync_media_to_r2, daemon=True).start()
     return len(catalog)
+
+
+def sync_media_to_r2():
+    """Mirror local song files to R2 so the cloud /tablet can stream them
+    directly to guests. Runs in a background thread — safe to re-run (skips
+    files already uploaded), so it's called on every startup/resync and only
+    does real work for songs that are new since the last sync."""
+    todo = list(LOCAL_MAP.items())
+    uploaded = skipped = failed = 0
+    for key, entry in todo:
+        try:
+            if r2_storage.object_exists(key):
+                skipped += 1
+            else:
+                r2_storage.upload_file(key, entry["path"])
+                uploaded += 1
+                print(f"  [r2] uploaded {key}")
+        except Exception as e:
+            failed += 1
+            print(f"  [r2] failed to upload {key}: {e}")
+
+        if entry["cdg"]:
+            cdg_key = os.path.splitext(key)[0] + ".cdg"
+            try:
+                if r2_storage.object_exists(cdg_key):
+                    skipped += 1
+                else:
+                    r2_storage.upload_file(cdg_key, entry["cdg"])
+                    uploaded += 1
+                    print(f"  [r2] uploaded {cdg_key}")
+            except Exception as e:
+                failed += 1
+                print(f"  [r2] failed to upload {cdg_key}: {e}")
+    print(f"  [r2] sync done — {uploaded} uploaded, {skipped} already present, "
+          f"{failed} failed")
 
 
 # --------------------------------------------------------------------------
@@ -193,6 +233,7 @@ if __name__ == "__main__":
     ip = local_ip()
     print(f"  Songs found : {n}   (from {SONGS_DIR})")
     print(f"  Cloud       : {CLOUD_URL or '(CLOUD_URL not set)'}")
+    print(f"  R2 media    : {'syncing in background' if r2_storage.ENABLED else '(not configured — cloud /tablet has no video)'}")
     print(f"  Player (TV) : http://{ip}:{AGENT_PORT}/player   <- open fullscreen")
     print("=" * 60)
     app.run(host="0.0.0.0", port=AGENT_PORT, threaded=True)

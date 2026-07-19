@@ -11,16 +11,19 @@ const reqSinger = document.getElementById("reqSinger");
 const reqConfirm = document.getElementById("reqConfirm");
 const reqCancel = document.getElementById("reqCancel");
 
-const lyricsCard = document.getElementById("lyricsCard");
-const lyricsBody = document.getElementById("lyricsBody");
-const lyricsName = document.getElementById("lyricsName");
-const lyricsToggle = document.getElementById("lyricsToggle");
+const video = document.getElementById("video");
+const audio = document.getElementById("audio");
+const canvas = document.getElementById("cdg");
+const idle = document.getElementById("idle");
+const cdg = new CDGPlayer(canvas);
 
 let searchTimer = null;
 let pendingSong = null;
-let lastLyricSongId = null;
-
-lyricsToggle.onclick = () => lyricsCard.classList.toggle("collapsed");
+let currentQueueId = null;
+let currentKind = null;
+let playerVolume = 1.0;
+let cdgActive = false;
+let songEnded = false;
 
 function stagger(container) {
   [...container.children].forEach((c, i) => {
@@ -113,58 +116,121 @@ async function loadQueue() {
   stagger(queueEl);
 }
 
+function activeMedia() {
+  return currentKind === "video" ? video : audio;
+}
+
+function hidePlayer() {
+  video.style.display = "none";
+  canvas.style.display = "none";
+  idle.style.display = "";
+}
+
+function onEnded() {
+  songEnded = true;
+  api("/api/player/ended", { method: "POST" }).catch(() => {});
+}
+
+async function loadSong(it) {
+  currentQueueId = it.queue_id;
+  currentKind = it.kind;
+  cdgActive = false;
+  songEnded = false;
+  idle.style.display = "none";
+
+  video.pause(); audio.pause();
+  video.removeAttribute("src"); video.load();
+
+  if (it.kind === "video") {
+    video.style.display = "";
+    canvas.style.display = "none";
+    video.src = "/media/" + it.song_id;
+    video.volume = playerVolume;
+    video.onended = onEnded;
+    video.play().catch(() => {});
+  } else {
+    video.style.display = "none";
+    audio.src = "/media/" + it.song_id;
+    audio.volume = playerVolume;
+    audio.onended = onEnded;
+    if (it.kind === "cdg") {
+      canvas.style.display = "";
+      try {
+        const buf = await fetch("/media/" + it.song_id + "/cdg")
+          .then((r) => r.arrayBuffer());
+        await cdg.load(buf);
+        cdgActive = true;
+      } catch (e) {
+        canvas.style.display = "none";
+      }
+    } else {
+      canvas.style.display = "none";
+    }
+    audio.play().catch(() => {});
+  }
+}
+
 async function loadNow() {
   let st;
   try { st = await api("/api/player/state"); } catch (e) { return; }
+  playerVolume = st.volume;
+  video.volume = playerVolume;
+  audio.volume = playerVolume;
+
   if (st.current) {
     nowEl.classList.remove("idle");
     npTitle.textContent = st.current.title;
     npMeta.innerHTML =
       (st.current.artist || "Unknown") +
       ' · <span class="singer">🎤 ' + st.current.singer + "</span>";
-    // Fetch lyrics once per song change.
-    if (st.current.song_id !== lastLyricSongId) {
-      lastLyricSongId = st.current.song_id;
-      loadLyrics(st.current.song_id);
+
+    if (st.current.queue_id !== currentQueueId) {
+      await loadSong(st.current);
+    } else {
+      if (st.seek_to != null) {
+        activeMedia().currentTime = st.seek_to;
+        api("/api/player/seeked", { method: "POST" }).catch(() => {});
+      }
+      const m = activeMedia();
+      if (st.status === "playing" && m.paused && !songEnded) {
+        m.play().catch(() => {});
+      } else if (st.status === "paused" && !m.paused) {
+        m.pause();
+      } else if (st.status === "stopped") {
+        m.pause();
+      }
     }
   } else {
     nowEl.classList.add("idle");
     npTitle.textContent = "Welcome to Melbourne Karaoke";
     npMeta.textContent = "Search a song below and add it to the queue";
-    lastLyricSongId = null;
-    lyricsCard.style.display = "none";
+    currentQueueId = null;
+    currentKind = null;
+    video.pause(); audio.pause();
+    hidePlayer();
   }
 }
 
-async function loadLyrics(songId) {
-  lyricsCard.style.display = "";
-  lyricsCard.classList.remove("collapsed");
-  lyricsName.textContent = "loading…";
-  lyricsBody.innerHTML = '<span class="muted">Finding lyrics…</span>';
-  let res;
-  try {
-    res = await api("/api/lyrics?song_id=" + songId);
-  } catch (e) {
-    lyricsBody.innerHTML = '<span class="muted">Lyrics unavailable right now.</span>';
-    lyricsName.textContent = "";
-    return;
+function renderLoop() {
+  if (cdgActive && currentKind === "cdg") {
+    cdg.render(audio.currentTime);
   }
-  if (lastLyricSongId !== songId) return;   // song changed while loading
-  if (res.found) {
-    lyricsName.textContent = res.name || "";
-    lyricsBody.textContent = res.plain;
-    const src = document.createElement("span");
-    src.className = "lyrics-src";
-    src.textContent = "Lyrics via " + (res.source || "LRCLIB") +
-      " · timing may differ from the karaoke track";
-    lyricsBody.appendChild(src);
-    lyricsBody.scrollTop = 0;
-  } else {
-    lyricsName.textContent = "";
-    lyricsBody.innerHTML =
-      '<span class="muted">No lyrics found for this track — follow the screen! 🎤</span>';
-  }
+  requestAnimationFrame(renderLoop);
 }
+requestAnimationFrame(renderLoop);
+
+// Report playback time so the admin seek bar / progress readout stays live.
+function reportPosition() {
+  if (!currentQueueId) return;
+  const m = activeMedia();
+  if (!m || !isFinite(m.duration) || m.duration === 0) return;
+  api("/api/player/position", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ position: m.currentTime, duration: m.duration }),
+  }).catch(() => {});
+}
+setInterval(reportPosition, 3000);
 
 qEl.addEventListener("input", () => {
   clearTimeout(searchTimer);
@@ -174,4 +240,5 @@ qEl.addEventListener("input", () => {
 search();
 loadQueue();
 loadNow();
-setInterval(() => { loadQueue(); loadNow(); }, 4000);
+setInterval(loadNow, 1000);
+setInterval(loadQueue, 4000);

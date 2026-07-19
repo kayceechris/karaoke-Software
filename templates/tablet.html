@@ -26,21 +26,19 @@
   </header>
 
   <div class="wrap">
+    <!-- Live karaoke player -->
+    <div id="playerBox" class="player-box">
+      <div id="idle">🎤 Ready — add a song below</div>
+      <video id="video" style="display:none" playsinline></video>
+      <canvas id="cdg" style="display:none"></canvas>
+      <audio id="audio" style="display:none"></audio>
+    </div>
+
     <!-- Now playing hero -->
     <div id="nowPlaying" class="now idle">
       <div class="label">🎤 On stage</div>
       <div class="np-title" id="npTitle">Welcome to Melbourne Karaoke</div>
       <div class="np-meta" id="npMeta">Search a song below and add it to the queue</div>
-    </div>
-
-    <!-- Lyrics for the now-playing song -->
-    <div id="lyricsCard" class="lyrics-card" style="display:none">
-      <button class="lyrics-head" id="lyricsToggle">
-        <span>📜 Lyrics</span>
-        <small id="lyricsName"></small>
-        <span class="lyrics-caret" id="lyricsCaret">▾</span>
-      </button>
-      <div id="lyricsBody" class="lyrics-body"></div>
     </div>
 
     <div class="search">
@@ -71,6 +69,7 @@
 
   <div id="toast"></div>
   <script src="/static/js/common.js"></script>
+  <script src="/static/js/cdg.js"></script>
   <script src="/static/js/tablet.js"></script>
 </body>
 </html>

@@ -220,32 +220,19 @@ input[type="search"]:focus, input[type="text"]:focus {
 .statuspill.playing { color: #71ffb0; background: rgba(45, 230, 130, .12); border-color: rgba(45, 230, 130, .3); }
 .statuspill.stopped { color: var(--muted); background: rgba(255, 255, 255, .05); border-color: var(--border); }
 
-/* ---- lyrics card (guest) ---- */
-.lyrics-card {
-  border-radius: 18px; margin-bottom: 8px; overflow: hidden;
-  background: var(--panel); border: 1px solid var(--border);
+/* ---- live player (guest tablet) ---- */
+.player-box {
+  position: relative; overflow: hidden; aspect-ratio: 16 / 9;
+  border-radius: 18px; margin-bottom: 14px;
+  background: #000; border: 1px solid var(--border); box-shadow: var(--shadow);
+  display: flex; align-items: center; justify-content: center;
   animation: cardIn .4s ease both;
 }
-.lyrics-head {
-  width: 100%; display: flex; align-items: center; gap: 10px;
-  padding: 14px 16px; background: transparent; border: none; border-radius: 0;
-  color: var(--text); font-weight: 700; font-size: 15px; cursor: pointer;
+.player-box video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.player-box canvas { image-rendering: pixelated; height: 100%; aspect-ratio: 300 / 216; }
+.player-box #idle {
+  color: var(--muted); text-align: center; font-size: 14px; padding: 0 20px;
 }
-.lyrics-head:hover { transform: none; background: var(--panel-strong); }
-.lyrics-head small { flex: 1; text-align: left; color: var(--muted); font-weight: 500; font-size: 12px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lyrics-caret { transition: transform .25s; color: var(--cyan); }
-.lyrics-card.collapsed .lyrics-caret { transform: rotate(-90deg); }
-.lyrics-body {
-  padding: 4px 18px 18px; max-height: 320px; overflow-y: auto;
-  white-space: pre-wrap; line-height: 1.7; color: #dfe3ff; font-size: 15.5px;
-  scrollbar-width: thin; scrollbar-color: var(--violet) transparent;
-}
-.lyrics-card.collapsed .lyrics-body { display: none; }
-.lyrics-body::-webkit-scrollbar { width: 6px; }
-.lyrics-body::-webkit-scrollbar-thumb { background: var(--violet); border-radius: 999px; }
-.lyrics-body .muted { color: var(--muted); font-style: italic; }
-.lyrics-src { display: block; margin-top: 14px; font-size: 11px; color: var(--muted); }
 
 /* ---- admin transport ---- */
 .transport { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 18px 0; }
@@ -327,8 +314,6 @@ code.url { color: var(--cyan); word-break: break-all; }
   .meta .artist { font-size: 11px; }
   button, .btn { font-size: 14px; padding: 10px 14px; }
   .btn-icon { width: 38px; height: 38px; font-size: 16px; }
-  .lyrics-body { font-size: 14px; max-height: 240px; }
-  .lyrics-head { padding: 12px 14px; font-size: 14px; }
 }
 
 @media (max-width: 380px) {
@@ -345,7 +330,6 @@ code.url { color: var(--cyan); word-break: break-all; }
   .meta .artist { font-size: 11px; }
   .tag { display: none; }
   button, .btn { font-size: 13px; padding: 9px 11px; }
-  .lyrics-body { font-size: 13px; max-height: 200px; }
   .modal { padding: 20px 16px 16px; margin: 0 10px; }
   .modal h3 { font-size: 17px; }
 }

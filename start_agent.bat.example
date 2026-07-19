@@ -9,6 +9,15 @@ set CLOUD_URL=https://your-app.onrender.com
 set HOST_TOKEN=paste-your-host-token-here
 REM ==========================================================
 
+REM ===== Optional: Cloudflare R2, so cloud guests get real video =====
+REM Leave blank to skip — cloud /tablet just won't have video (unchanged).
+set R2_ACCOUNT_ID=
+set R2_ACCESS_KEY_ID=
+set R2_SECRET_ACCESS_KEY=
+set R2_BUCKET=
+set R2_PUBLIC_BASE_URL=
+REM ====================================================================
+
 if not exist ".venv\" (
     echo Creating virtual environment...
     python -m venv .venv

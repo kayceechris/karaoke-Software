@@ -44,6 +44,38 @@ local file on the TV.
 - **Host:** open `https://<your-cloud-url>/admin`, enter the `HOST_TOKEN` once, control playback.
 - Add/remove song files on the laptop, then restart the agent (or `POST /api/resync`) to refresh.
 
+### Optional: real video on the guest tablet (Cloudflare R2)
+
+By default the cloud `/tablet` only shows text ("now playing" title/singer) —
+guests' phones have no way to reach video files that live only on your
+laptop. To show the actual karaoke video at the top of `/tablet`, mirror your
+song files to Cloudflare R2 (free tier: 10GB storage, **zero egress fees**,
+which matters since every guest view is a full video download):
+
+1. Cloudflare dashboard → **R2** → create a bucket (any name).
+2. Bucket → **Settings** → **Public access** → enable the public dev URL
+   (`https://pub-xxxxxxxx.r2.dev`) or attach a custom domain. Copy that base URL.
+3. **R2** → **Manage API tokens** → create a token scoped to that bucket
+   (read + write). Copy the **Access Key ID** and **Secret Access Key**, and
+   note your **Account ID** (shown on the R2 overview page).
+4. On the **laptop**, edit [start_agent.bat](start_agent.bat) and fill in
+   `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`,
+   **and** `R2_PUBLIC_BASE_URL` (the agent uses this to check which files are
+   already uploaded, not just to serve them).
+5. On **Render**, open the service → **Environment** → add `R2_PUBLIC_BASE_URL`
+   too (the public URL from step 2, no trailing slash).
+6. Restart the agent. It mirrors every song to R2 in the background (logged
+   as `[r2] uploaded ...`) — safe to leave running, already-uploaded files are
+   skipped on future restarts/resyncs, so only new songs take time to upload.
+
+Leave any `R2_*` var blank/unset to skip this entirely — everything else
+works exactly as before, just without video on the cloud tablet.
+
+**Known limits:** a brand-new song only has video on the cloud tablet once
+its upload finishes (bounded by your home upload speed); removing a local
+file doesn't delete it from R2 (clean up manually in the Cloudflare dashboard
+if you care about the free-tier storage cap).
+
 ---
 
 ## B. Offline LAN mode (no internet, single laptop)
@@ -91,10 +123,11 @@ Downloads karaoke videos as `Artist - Title.mp4` into `songs/`. Re-run the agent
 
 | File | Role |
 |------|------|
-| [cloud_app.py](cloud_app.py) | Cloud brain — queue, /tablet, /admin, catalog API (deploy this) |
-| [agent.py](agent.py) | Laptop agent — uploads catalog, serves /player, plays local files |
+| [cloud_app.py](cloud_app.py) | Cloud brain — queue, /tablet, /admin, catalog API, /media redirects (deploy this) |
+| [agent.py](agent.py) | Laptop agent — uploads catalog, serves /player, plays local files, syncs media to R2 |
 | [app.py](app.py) | All‑in‑one offline LAN server |
 | [db.py](db.py) | DB adapter (SQLite local / Postgres on Render) |
+| [r2_storage.py](r2_storage.py) | Cloudflare R2 client (agent-only) so cloud guests get real video |
 | [fetch_songs.py](fetch_songs.py) | Karaoke downloader |
 | [render.yaml](render.yaml) / [vercel.json](vercel.json) / [Procfile](Procfile) | Deploy configs |
 | [start.bat](start.bat) / [start_agent.bat](start_agent.bat) | Windows launchers |
@@ -108,6 +141,8 @@ Downloads karaoke videos as `Artist - Title.mp4` into `songs/`. Re-run the agent
 | `CLOUD_URL` | agent | URL of the deployed cloud brain |
 | `KARAOKE_SONGS_DIR` | agent / offline | Songs folder (default `./songs`) |
 | `AGENT_PORT` / `KARAOKE_PORT` | agent / offline | Local port (5050 / 5000) |
+| `R2_PUBLIC_BASE_URL` | cloud + agent | Public R2 bucket URL. Needed on **both**: cloud uses it to redirect `/media`, agent uses it to check which files are already uploaded. Unset → cloud `/tablet` has no video (text only) |
+| `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | agent | Credentials the agent uses to mirror songs to R2. All optional — unset skips media sync entirely |
 
 ## Troubleshooting
 
