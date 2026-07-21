@@ -184,7 +184,22 @@ async function loadSong(it) {
   }
 }
 
+let _loadNowBusy = false;
 async function loadNow() {
+  // Guard against overlap: at a 400ms poll interval, a slow response could
+  // still be in flight when the next tick fires. Without this, an older
+  // response landing after a newer one could see a stale queue_id and
+  // "helpfully" switch back to the song that's no longer playing.
+  if (_loadNowBusy) return;
+  _loadNowBusy = true;
+  try {
+    await _loadNow();
+  } finally {
+    _loadNowBusy = false;
+  }
+}
+
+async function _loadNow() {
   let st;
   try { st = await api("/api/player/state"); } catch (e) { return; }
   playerVolume = st.volume;
