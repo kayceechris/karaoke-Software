@@ -101,6 +101,12 @@ def manifest():
                      mimetype="application/manifest+json")
 
 
+@app.route("/admin-manifest.webmanifest")
+def admin_manifest():
+    return send_file(os.path.join(app.static_folder, "admin-manifest.webmanifest"),
+                     mimetype="application/manifest+json")
+
+
 # ---- QR code: printable poster guests scan to open /tablet ----
 def _tablet_url():
     # Render terminates TLS upstream, so trust the forwarded scheme for https.

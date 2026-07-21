@@ -209,6 +209,12 @@ def manifest():
                      mimetype="application/manifest+json")
 
 
+@app.route("/admin-manifest.webmanifest")
+def admin_manifest():
+    return send_file(os.path.join(app.static_folder, "admin-manifest.webmanifest"),
+                     mimetype="application/manifest+json")
+
+
 def _tablet_url():
     return f"http://{local_ip()}:{PORT}/tablet"
 

@@ -1,12 +1,15 @@
 /* Melbourne Karaoke — service worker (PWA offline shell). */
-const CACHE = "mk-v3";
+const CACHE = "mk-v4";
 const SHELL = [
   "/tablet",
+  "/admin",
   "/static/css/style.css",
   "/static/js/common.js",
   "/static/js/tablet.js",
+  "/static/js/admin.js",
   "/static/img/logo.png",
   "/static/manifest.webmanifest",
+  "/static/admin-manifest.webmanifest",
   "/static/img/icon-192.png",
 ];
 
