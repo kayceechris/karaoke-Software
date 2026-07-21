@@ -84,16 +84,30 @@ def init_db():
             );
 
             CREATE TABLE IF NOT EXISTS player_state (
-                id      INTEGER PRIMARY KEY CHECK (id = 1),
-                status  TEXT NOT NULL DEFAULT 'stopped',  -- playing | paused | stopped
-                volume  REAL NOT NULL DEFAULT 1.0,
-                seq     INTEGER NOT NULL DEFAULT 0        -- bumps on every command
+                id       INTEGER PRIMARY KEY CHECK (id = 1),
+                status   TEXT NOT NULL DEFAULT 'stopped',  -- playing | paused | stopped
+                volume   REAL NOT NULL DEFAULT 1.0,
+                seq      INTEGER NOT NULL DEFAULT 0,        -- bumps on every command
+                position REAL NOT NULL DEFAULT 0,           -- last reported playback time
+                duration REAL NOT NULL DEFAULT 0,
+                seek_to  REAL                               -- pending seek target (null = none)
             );
 
             INSERT OR IGNORE INTO player_state (id, status, volume, seq)
             VALUES (1, 'stopped', 1.0, 0);
             """
         )
+        # Migrate DBs created before position/duration/seek_to existed. Each in
+        # its own try so a pre-existing column doesn't abort the rest.
+        for _col in [
+            "ALTER TABLE player_state ADD COLUMN position REAL NOT NULL DEFAULT 0",
+            "ALTER TABLE player_state ADD COLUMN duration REAL NOT NULL DEFAULT 0",
+            "ALTER TABLE player_state ADD COLUMN seek_to  REAL",
+        ]:
+            try:
+                db.execute(_col)
+            except sqlite3.OperationalError:
+                pass  # column already exists
         db.commit()
 
 
@@ -309,6 +323,31 @@ def api_queue_top(qid):
     return jsonify(ok=True)
 
 
+@app.route("/api/queue/<int:qid>/move", methods=["POST"])
+def api_queue_move(qid):
+    """Swap a waiting item with its immediate neighbor (direction: up/down)."""
+    data = request.get_json(force=True)
+    direction = data.get("direction")
+    if direction not in ("up", "down"):
+        abort(400)
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, position FROM queue WHERE status='waiting' "
+        "ORDER BY position ASC, id ASC"
+    ).fetchall()
+    ids = [r["id"] for r in rows]
+    if qid not in ids:
+        abort(404)
+    idx = ids.index(qid)
+    swap_idx = idx - 1 if direction == "up" else idx + 1
+    if 0 <= swap_idx < len(ids):
+        a, b = rows[idx], rows[swap_idx]
+        db.execute("UPDATE queue SET position=? WHERE id=?", (b["position"], a["id"]))
+        db.execute("UPDATE queue SET position=? WHERE id=?", (a["position"], b["id"]))
+        db.commit()
+    return jsonify(ok=True)
+
+
 # --------------------------------------------------------------------------
 # Player control + state
 # --------------------------------------------------------------------------
@@ -332,20 +371,28 @@ def advance(db):
     ).fetchone()
     if nxt:
         db.execute("UPDATE queue SET status='playing' WHERE id=?", (nxt["id"],))
-        db.execute("UPDATE player_state SET status='playing' WHERE id=1")
+        db.execute("UPDATE player_state SET status='playing', seek_to=NULL, "
+                   "position=0, duration=0 WHERE id=1")
     else:
-        db.execute("UPDATE player_state SET status='stopped' WHERE id=1")
+        db.execute("UPDATE player_state SET status='stopped', seek_to=NULL, "
+                   "position=0, duration=0 WHERE id=1")
 
 
 @app.route("/api/player/state")
 def api_player_state():
     db = get_db()
-    st = db.execute("SELECT status, volume, seq FROM player_state WHERE id=1").fetchone()
+    st = db.execute(
+        "SELECT status, volume, seq, position, duration, seek_to "
+        "FROM player_state WHERE id=1"
+    ).fetchone()
     cur = current_playing(db)
     return jsonify(
         status=st["status"],
         volume=st["volume"],
         seq=st["seq"],
+        position=st["position"] or 0,
+        duration=st["duration"] or 0,
+        seek_to=st["seek_to"],
         current=dict(cur) if cur else None,
     )
 
@@ -376,8 +423,19 @@ def api_player_command():
         db.execute("UPDATE queue SET status='done' WHERE status='playing'")
         db.execute("UPDATE player_state SET status='stopped' WHERE id=1")
     elif action == "volume":
-        vol = max(0.0, min(1.0, float(data.get("value", 1.0))))
+        try:
+            vol = max(0.0, min(1.0, float(data.get("value", 1.0))))
+        except (TypeError, ValueError):
+            abort(400)
         db.execute("UPDATE player_state SET volume=? WHERE id=1", (vol,))
+    elif action == "seek":
+        try:
+            seek_to = float(data.get("value", 0))
+        except (TypeError, ValueError):
+            abort(400)
+        db.execute("UPDATE player_state SET seek_to=? WHERE id=1", (seek_to,))
+    elif action == "restart":
+        db.execute("UPDATE player_state SET seek_to=0, status='playing' WHERE id=1")
     else:
         abort(400)
 
@@ -392,6 +450,32 @@ def api_player_ended():
     db = get_db()
     advance(db)
     db.execute("UPDATE player_state SET seq = seq + 1 WHERE id=1")
+    db.commit()
+    return jsonify(ok=True)
+
+
+@app.route("/api/player/position", methods=["POST"])
+def api_player_position():
+    """The player page reports its current playback time so admin can show
+    a live seek bar."""
+    data = request.get_json(force=True)
+    try:
+        pos = float(data.get("position", 0))
+        dur = float(data.get("duration", 0))
+    except (TypeError, ValueError):
+        abort(400)
+    db = get_db()
+    db.execute("UPDATE player_state SET position=?, duration=? WHERE id=1",
+               (pos, dur))
+    db.commit()
+    return jsonify(ok=True)
+
+
+@app.route("/api/player/seeked", methods=["POST"])
+def api_player_seeked():
+    """The player acknowledges it has applied the pending seek target."""
+    db = get_db()
+    db.execute("UPDATE player_state SET seek_to=NULL WHERE id=1")
     db.commit()
     return jsonify(ok=True)
 

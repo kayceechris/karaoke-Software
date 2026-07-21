@@ -187,6 +187,15 @@ input[type="search"]:focus, input[type="text"]:focus {
 .empty { color: var(--muted); text-align: center; padding: 46px 0; }
 .empty .big { font-size: 40px; margin-bottom: 8px; filter: grayscale(.3); }
 
+/* ---- connection banner ---- */
+.conn-banner {
+  border-radius: 14px; padding: 12px 16px; margin-bottom: 12px;
+  background: rgba(45, 226, 230, .1); border: 1px solid rgba(45, 226, 230, .3);
+  color: var(--cyan); font-size: 13px; font-weight: 600; text-align: center;
+  animation: pulseBanner 1.6s ease-in-out infinite;
+}
+@keyframes pulseBanner { 50% { opacity: .6; } }
+
 /* ---- now playing hero ---- */
 .now {
   position: relative; overflow: hidden;

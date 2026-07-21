@@ -393,6 +393,30 @@ def api_queue_top(qid):
     return jsonify(ok=True)
 
 
+@app.route("/api/queue/<int:qid>/move", methods=["POST"])
+@require_host
+def api_queue_move(qid):
+    """Swap a waiting item with its immediate neighbor (direction: up/down)."""
+    data = request.get_json(force=True)
+    direction = data.get("direction")
+    if direction not in ("up", "down"):
+        abort(400)
+    rows = db.fetchall(
+        "SELECT id, position FROM queue WHERE status='waiting' "
+        "ORDER BY position ASC, id ASC")
+    ids = [r["id"] for r in rows]
+    if qid not in ids:
+        abort(404)
+    idx = ids.index(qid)
+    swap_idx = idx - 1 if direction == "up" else idx + 1
+    if 0 <= swap_idx < len(ids):
+        a, b = rows[idx], rows[swap_idx]
+        with db.transaction() as cur:
+            db.x(cur, "UPDATE queue SET position=? WHERE id=?", (b["position"], a["id"]))
+            db.x(cur, "UPDATE queue SET position=? WHERE id=?", (a["position"], b["id"]))
+    return jsonify(ok=True)
+
+
 # --------------------------------------------------------------------------
 # Player state + control
 # --------------------------------------------------------------------------

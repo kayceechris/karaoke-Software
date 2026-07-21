@@ -7,8 +7,10 @@ const qcount = document.getElementById("qcount");
 const volEl = document.getElementById("vol");
 const seekEl = document.getElementById("seek");
 const seekTimeEl = document.getElementById("seekTime");
+const connBanner = document.getElementById("connBanner");
 
 let _dur = 0, _pos = 0, _dragging = false, _ticker = null;
+let _connected = false, _refreshTimer = null;
 
 function fmt(s) {
   s = Math.max(0, Math.floor(s || 0));
@@ -100,23 +102,35 @@ function setNow(state) {
 }
 
 async function refresh() {
+  clearTimeout(_refreshTimer);
   let state, items;
   try {
     [state, items] = await Promise.all([
       api("/api/player/state"),
       api("/api/queue"),
     ]);
-  } catch (e) { return; }
+  } catch (e) {
+    // Free-tier Render can take up to ~60s to wake from idle — the first
+    // request(s) can outlive our short per-call timeout. Show that we're
+    // still trying instead of leaving stale/empty panels with no feedback,
+    // and retry quickly rather than waiting out the normal 3s cadence.
+    connBanner.style.display = _connected ? "none" : "";
+    _refreshTimer = setTimeout(refresh, 1500);
+    return;
+  }
+  _connected = true;
+  connBanner.style.display = "none";
 
   setNow(state);
   if (document.activeElement !== volEl) volEl.value = state.volume;
 
-  const waiting = items.filter((i) => i.status === "waiting").length;
-  qcount.textContent = waiting ? `(${waiting} waiting)` : "";
+  const waitingItems = items.filter((i) => i.status === "waiting");
+  qcount.textContent = waitingItems.length ? `(${waitingItems.length} waiting)` : "";
 
   queueEl.innerHTML = "";
   if (!items.length) {
     queueEl.innerHTML = '<div class="empty">Queue is empty.</div>';
+    _refreshTimer = setTimeout(refresh, 3000);
     return;
   }
   items.forEach((it, i) => {
@@ -131,9 +145,38 @@ async function refresh() {
     div.querySelector(".artist").textContent = (it.artist || "Unknown") + " · 🎤 " + it.singer;
 
     if (!playing) {
+      const waitIdx = waitingItems.indexOf(it);
+
+      const up = document.createElement("button");
+      up.className = "btn btn-ghost btn-icon";
+      up.title = "Move up"; up.textContent = "↑";
+      up.disabled = waitIdx <= 0;
+      up.onclick = async () => {
+        await api(`/api/queue/${it.id}/move`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ direction: "up" }),
+        });
+        refresh();
+      };
+      div.appendChild(up);
+
+      const down = document.createElement("button");
+      down.className = "btn btn-ghost btn-icon";
+      down.title = "Move down"; down.textContent = "↓";
+      down.disabled = waitIdx === waitingItems.length - 1;
+      down.onclick = async () => {
+        await api(`/api/queue/${it.id}/move`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ direction: "down" }),
+        });
+        refresh();
+      };
+      div.appendChild(down);
+
       const top = document.createElement("button");
       top.className = "btn btn-ghost btn-icon";
-      top.title = "Move to top"; top.textContent = "↑";
+      top.title = "Move to top"; top.textContent = "⤒";
+      top.disabled = waitIdx <= 0;
       top.onclick = async () => { await api(`/api/queue/${it.id}/top`, { method: "POST" }); refresh(); };
       div.appendChild(top);
     }
@@ -149,7 +192,7 @@ async function refresh() {
     div.appendChild(del);
     queueEl.appendChild(div);
   });
+  _refreshTimer = setTimeout(refresh, 3000);
 }
 
 refresh();
-setInterval(refresh, 3000);

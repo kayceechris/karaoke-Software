@@ -43,6 +43,19 @@ function onEnded() {
   api("/api/player/ended", { method: "POST" }).catch(() => {});
 }
 
+// Report playback time so the admin seek bar / progress readout stays live.
+function reportPosition() {
+  if (!currentQueueId) return;
+  const m = activeMedia();
+  if (!m || !isFinite(m.duration) || m.duration === 0) return;
+  api("/api/player/position", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ position: m.currentTime, duration: m.duration }),
+  }).catch(() => {});
+}
+setInterval(reportPosition, 3000);
+
 async function loadSong(it) {
   currentQueueId = it.queue_id;
   currentKind = it.kind;
@@ -111,6 +124,12 @@ async function poll() {
   if (state.current.queue_id !== currentQueueId) {
     await loadSong(state.current);
     return;
+  }
+
+  // Apply a pending seek (from the admin seek bar / restart), then ack it.
+  if (state.seek_to != null) {
+    activeMedia().currentTime = state.seek_to;
+    api("/api/player/seeked", { method: "POST" }).catch(() => {});
   }
 
   // same song -> reconcile play/pause
