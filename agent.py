@@ -15,13 +15,19 @@ Configure with environment variables (or a .env-style export):
   HOST_TOKEN   same secret you set on the cloud       (required if cloud has one)
   KARAOKE_SONGS_DIR   default ./songs
   AGENT_PORT          default 5050
+  AUTO_LAUNCH_PLAYER  default on — opens /player itself, fullscreen, with
+                      sound already unlocked. Set to 0 to disable.
+  PLAYER_BROWSER_PATH optional override if Edge/Chrome auto-detection fails
 
 Run:  python agent.py
 """
 
 import os
+import shutil
 import socket
+import subprocess
 import threading
+import webbrowser
 
 import requests
 from flask import (Flask, jsonify, render_template, request, send_file,
@@ -34,6 +40,7 @@ SONGS_DIR = os.environ.get("KARAOKE_SONGS_DIR", os.path.join(BASE_DIR, "songs"))
 CLOUD_URL = os.environ.get("CLOUD_URL", "").rstrip("/")
 HOST_TOKEN = os.environ.get("HOST_TOKEN", "")
 AGENT_PORT = int(os.environ.get("AGENT_PORT", "5050"))
+AUTO_LAUNCH_PLAYER = os.environ.get("AUTO_LAUNCH_PLAYER", "1") not in ("0", "false", "False")
 
 VIDEO_EXTS = {".mp4", ".webm", ".m4v"}
 AUDIO_EXTS = {".mp3", ".m4a", ".ogg", ".wav"}
@@ -254,6 +261,43 @@ def local_ip():
         return "127.0.0.1"
 
 
+# --------------------------------------------------------------------------
+# Auto-launch the player (so sound comes out without anyone manually
+# opening a browser tab and clicking it — browsers otherwise block
+# autoplay-with-sound until a real user gesture)
+# --------------------------------------------------------------------------
+def _find_chromium():
+    """Edge ships with Windows, so try it first; fall back to Chrome."""
+    candidates = [
+        os.environ.get("PLAYER_BROWSER_PATH"),
+        shutil.which("msedge"),
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        shutil.which("chrome"),
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    ]
+    return next((p for p in candidates if p and os.path.isfile(p)), None)
+
+
+def launch_player():
+    """Open the TV player fullscreen with sound already unlocked. Falls back
+    to the system default browser (still needs one manual click to unlock
+    sound) if no Chromium-based browser is found."""
+    browser = _find_chromium()
+    if not browser:
+        print("  [warn] No Edge/Chrome found — opening player in your default "
+              "browser (click it once to unlock sound).")
+        webbrowser.open(f"http://127.0.0.1:{AGENT_PORT}/player")
+        return
+    url = f"http://127.0.0.1:{AGENT_PORT}/player?autoplay=1"
+    subprocess.Popen([
+        browser, f"--app={url}",
+        "--autoplay-policy=no-user-gesture-required",
+        "--start-fullscreen", "--new-window",
+    ])
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print(" Karaoke Laptop Agent")
@@ -263,6 +307,10 @@ if __name__ == "__main__":
     print(f"  Songs found : {n}   (from {SONGS_DIR})")
     print(f"  Cloud       : {CLOUD_URL or '(CLOUD_URL not set)'}")
     print(f"  R2 media    : {'syncing in background' if r2_storage.ENABLED else '(not configured — cloud /tablet has no video)'}")
-    print(f"  Player (TV) : http://{ip}:{AGENT_PORT}/player   <- open fullscreen")
+    print(f"  Player (TV) : http://{ip}:{AGENT_PORT}/player"
+          + ("   <- launching automatically" if AUTO_LAUNCH_PLAYER
+             else "   <- open fullscreen"))
     print("=" * 60)
+    if AUTO_LAUNCH_PLAYER:
+        threading.Timer(1.5, launch_player).start()
     app.run(host="0.0.0.0", port=AGENT_PORT, threaded=True)

@@ -20,13 +20,20 @@ let volume = 1.0;
 let cdgActive = false;
 let songEnded = false;
 
-tapstart.addEventListener("click", async () => {
+async function unlock() {
   unlocked = true;
   tapstart.style.display = "none";
   try { await video.play().catch(() => {}); video.pause(); } catch (e) {}
   try { await audio.play().catch(() => {}); audio.pause(); } catch (e) {}
   poll();
-});
+}
+
+tapstart.addEventListener("click", unlock);
+
+// agent.py launches this page itself with ?autoplay=1 and a Chromium flag
+// that permits autoplay-with-sound — skip the manual tap in that case so
+// audio starts as soon as the agent is running, nothing to click.
+if (new URLSearchParams(location.search).get("autoplay") === "1") unlock();
 
 function mediaUrl(key, cdgFlag) {
   const u = "/local-media/" + key.split("/").map(encodeURIComponent).join("/");
