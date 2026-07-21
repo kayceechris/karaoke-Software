@@ -222,7 +222,8 @@ input[type="search"]:focus, input[type="text"]:focus {
 
 /* ---- live player (guest tablet) ---- */
 .player-box {
-  position: relative; overflow: hidden; aspect-ratio: 16 / 9;
+  position: sticky; top: var(--header-h, 64px); z-index: 15;
+  overflow: hidden; aspect-ratio: 16 / 9;
   border-radius: 18px; margin-bottom: 14px;
   background: #000; border: 1px solid var(--border); box-shadow: var(--shadow);
   display: flex; align-items: center; justify-content: center;

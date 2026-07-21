@@ -22,6 +22,15 @@ const cdg = new CDGPlayer(canvas);
 video.muted = true;
 audio.muted = true;
 
+// Keep the sticky player pinned right below the appbar (its height varies
+// across the responsive breakpoints), so it stays visible while scrolling.
+const appbarEl = document.querySelector(".appbar");
+function syncHeaderHeight() {
+  document.documentElement.style.setProperty("--header-h", appbarEl.offsetHeight + "px");
+}
+syncHeaderHeight();
+window.addEventListener("resize", syncHeaderHeight);
+
 let searchTimer = null;
 let pendingSong = null;
 let currentQueueId = null;
