@@ -71,7 +71,7 @@ def home():
 
 @app.route("/tablet")
 def tablet():
-    return render_template("tablet.html")
+    return render_template("tablet.html", r2_base_url=R2_PUBLIC_BASE_URL)
 
 
 @app.route("/admin")

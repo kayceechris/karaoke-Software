@@ -254,5 +254,9 @@ qEl.addEventListener("input", () => {
 search();
 loadQueue();
 loadNow();
-setInterval(loadNow, 1000);
+// Tighter than the 1s default: the host's TV plays its video from a local
+// file (near-instant start), while a tablet's video streams over the
+// network from R2 — every millisecond of detection delay here adds
+// directly to how far behind the host's audio the tablet looks.
+setInterval(loadNow, 400);
 setInterval(loadQueue, 4000);

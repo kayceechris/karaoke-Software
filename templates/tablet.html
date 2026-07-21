@@ -13,6 +13,12 @@
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
   <link rel="icon" href="/static/img/logo.png">
   <link rel="stylesheet" href="/static/css/style.css">
+  {% if r2_base_url %}
+  <!-- Warm the connection to R2 up front so the video doesn't pay the
+       TLS/TCP handshake cost when a song actually starts playing. -->
+  <link rel="preconnect" href="{{ r2_base_url }}" crossorigin>
+  <link rel="dns-prefetch" href="{{ r2_base_url }}">
+  {% endif %}
 </head>
 <body>
   <div class="bgblob"></div>
@@ -29,9 +35,9 @@
     <!-- Live karaoke player -->
     <div id="playerBox" class="player-box">
       <div id="idle">🎤 Ready — add a song below</div>
-      <video id="video" style="display:none" playsinline muted></video>
+      <video id="video" style="display:none" playsinline muted preload="auto"></video>
       <canvas id="cdg" style="display:none"></canvas>
-      <audio id="audio" style="display:none" muted></audio>
+      <audio id="audio" style="display:none" muted preload="auto"></audio>
     </div>
 
     <!-- Now playing hero -->
