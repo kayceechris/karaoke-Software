@@ -17,6 +17,11 @@ const canvas = document.getElementById("cdg");
 const idle = document.getElementById("idle");
 const cdg = new CDGPlayer(canvas);
 
+// Guests watch the video for fun, but the venue's TV/speakers are the real
+// sound — muted here so every phone doesn't also blast audio out of sync.
+video.muted = true;
+audio.muted = true;
+
 let searchTimer = null;
 let pendingSong = null;
 let currentQueueId = null;
