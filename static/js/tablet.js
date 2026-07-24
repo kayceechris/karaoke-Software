@@ -145,7 +145,7 @@ function onEnded() {
   api("/api/player/ended", { method: "POST" }).catch(() => {});
 }
 
-async function loadSong(it) {
+async function loadSong(it, startAt) {
   currentQueueId = it.queue_id;
   currentKind = it.kind;
   cdgActive = false;
@@ -155,18 +155,30 @@ async function loadSong(it) {
   video.pause(); audio.pause();
   video.removeAttribute("src"); video.load();
 
+  // Join an already-playing song where it currently is, rather than
+  // restarting it from 0:00 — matters when a second guest opens the
+  // tablet after the song has already been running for a while.
+  const seekTo = startAt || 0;
+  function seekOnceReady(m) {
+    if (seekTo <= 0) return;
+    if (m.readyState >= 1) { m.currentTime = seekTo; return; }
+    m.addEventListener("loadedmetadata", () => { m.currentTime = seekTo; }, { once: true });
+  }
+
   if (it.kind === "video") {
     video.style.display = "";
     canvas.style.display = "none";
     video.src = "/media/" + it.song_id;
     video.volume = playerVolume;
     video.onended = onEnded;
+    seekOnceReady(video);
     video.play().catch(() => {});
   } else {
     video.style.display = "none";
     audio.src = "/media/" + it.song_id;
     audio.volume = playerVolume;
     audio.onended = onEnded;
+    seekOnceReady(audio);
     if (it.kind === "cdg") {
       canvas.style.display = "";
       try {
@@ -214,7 +226,7 @@ async function _loadNow() {
       ' · <span class="singer">🎤 ' + st.current.singer + "</span>";
 
     if (st.current.queue_id !== currentQueueId) {
-      await loadSong(st.current);
+      await loadSong(st.current, st.position);
     } else {
       if (st.seek_to != null) {
         activeMedia().currentTime = st.seek_to;
