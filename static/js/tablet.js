@@ -141,8 +141,13 @@ function hidePlayer() {
 }
 
 function onEnded() {
+  // Tablets are passive followers of the shared queue, never the authority
+  // on it — only the host's own player (wired to the actual sound system)
+  // should ever call /api/player/ended. If a tablet's video finishes first
+  // (easily possible once its start time is deliberately offset from the
+  // host's), it must NOT advance the queue for everyone else. Just freeze
+  // here and wait for the next poll to say what's actually current.
   songEnded = true;
-  api("/api/player/ended", { method: "POST" }).catch(() => {});
 }
 
 async function loadSong(it, startAt) {
@@ -260,18 +265,10 @@ function renderLoop() {
 }
 requestAnimationFrame(renderLoop);
 
-// Report playback time so the admin seek bar / progress readout stays live.
-function reportPosition() {
-  if (!currentQueueId) return;
-  const m = activeMedia();
-  if (!m || !isFinite(m.duration) || m.duration === 0) return;
-  api("/api/player/position", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ position: m.currentTime, duration: m.duration }),
-  }).catch(() => {});
-}
-setInterval(reportPosition, 3000);
+// Position/duration reporting is the host's job only (it's the one wired to
+// the actual sound system) — tablets must not write to the shared player
+// state, or their own timing drift would corrupt the admin seek bar and
+// could race with the host's own reports.
 
 qEl.addEventListener("input", () => {
   clearTimeout(searchTimer);
