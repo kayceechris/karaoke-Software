@@ -21,6 +21,7 @@ Env vars:
 import io
 import os
 import re
+import time
 from functools import wraps
 from urllib.parse import quote
 
@@ -448,20 +449,36 @@ def _advance(cur):
     if nxt:
         db.x(cur, "UPDATE queue SET status='playing' WHERE id=?", (nxt["id"],))
         db.x(cur, "UPDATE player_state SET status='playing', seek_to=NULL, "
-                  "position=0, duration=0 WHERE id=1")
+                  "position=0, duration=0, position_at=? WHERE id=1", (time.time(),))
     else:
         db.x(cur, "UPDATE player_state SET status='stopped', seek_to=NULL, "
-                  "position=0, duration=0 WHERE id=1")
+                  "position=0, duration=0, position_at=? WHERE id=1", (time.time(),))
+
+
+def _extrapolate(st):
+    """The host only reports its position every few seconds — extrapolate
+    from the server clock so any client (a fresh tablet join, or an
+    already-playing one correcting drift) gets an accurate "right now"
+    position instead of a stale one."""
+    pos = st.get("position") or 0
+    dur = st.get("duration") or 0
+    at = st.get("position_at")
+    if st["status"] == "playing" and at:
+        pos += max(0, time.time() - at)
+        if dur:
+            pos = min(pos, dur)
+    return pos, dur
 
 
 @app.route("/api/player/state")
 def api_player_state():
     st = db.fetchone(
-        "SELECT status, volume, seq, position, duration, seek_to FROM player_state WHERE id=1")
+        "SELECT status, volume, seq, position, duration, seek_to, position_at "
+        "FROM player_state WHERE id=1")
     cur = current_playing()
+    pos, dur = _extrapolate(st)
     return jsonify(status=st["status"], volume=st["volume"], seq=st["seq"],
-                   position=st.get("position") or 0,
-                   duration=st.get("duration") or 0,
+                   position=pos, duration=dur,
                    seek_to=st.get("seek_to"),
                    current=cur)
 
@@ -501,9 +518,11 @@ def api_player_command():
                 seek_to = float(value)
             except (TypeError, ValueError):
                 abort(400)
-            db.x(cur, "UPDATE player_state SET seek_to=? WHERE id=1", (seek_to,))
+            db.x(cur, "UPDATE player_state SET seek_to=?, position=?, position_at=? "
+                      "WHERE id=1", (seek_to, seek_to, time.time()))
         elif action == "restart":
-            db.x(cur, "UPDATE player_state SET seek_to=0, status='playing' WHERE id=1")
+            db.x(cur, "UPDATE player_state SET seek_to=0, status='playing', "
+                      "position=0, position_at=? WHERE id=1", (time.time(),))
         else:
             abort(400)
         db.x(cur, "UPDATE player_state SET seq = seq + 1 WHERE id=1")
@@ -515,7 +534,8 @@ def api_player_command():
 def api_player_ended():
     with db.transaction() as cur:
         _advance(cur)
-        db.x(cur, "UPDATE player_state SET seq = seq + 1, position=0, duration=0 WHERE id=1")
+        db.x(cur, "UPDATE player_state SET seq = seq + 1, position=0, duration=0, "
+                  "position_at=? WHERE id=1", (time.time(),))
     return jsonify(ok=True)
 
 
@@ -525,7 +545,8 @@ def api_player_position():
     data = request.get_json(force=True)
     pos = float(data.get("position", 0))
     dur = float(data.get("duration", 0))
-    db.execute("UPDATE player_state SET position=?, duration=? WHERE id=1", (pos, dur))
+    db.execute("UPDATE player_state SET position=?, duration=?, position_at=? WHERE id=1",
+               (pos, dur, time.time()))
     return jsonify(ok=True)
 
 

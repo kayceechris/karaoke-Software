@@ -20,6 +20,7 @@ import io
 import os
 import socket
 import sqlite3
+import time
 from contextlib import closing
 
 import qrcode
@@ -84,13 +85,14 @@ def init_db():
             );
 
             CREATE TABLE IF NOT EXISTS player_state (
-                id       INTEGER PRIMARY KEY CHECK (id = 1),
-                status   TEXT NOT NULL DEFAULT 'stopped',  -- playing | paused | stopped
-                volume   REAL NOT NULL DEFAULT 1.0,
-                seq      INTEGER NOT NULL DEFAULT 0,        -- bumps on every command
-                position REAL NOT NULL DEFAULT 0,           -- last reported playback time
-                duration REAL NOT NULL DEFAULT 0,
-                seek_to  REAL                               -- pending seek target (null = none)
+                id          INTEGER PRIMARY KEY CHECK (id = 1),
+                status      TEXT NOT NULL DEFAULT 'stopped',  -- playing | paused | stopped
+                volume      REAL NOT NULL DEFAULT 1.0,
+                seq         INTEGER NOT NULL DEFAULT 0,        -- bumps on every command
+                position    REAL NOT NULL DEFAULT 0,           -- last reported playback time
+                duration    REAL NOT NULL DEFAULT 0,
+                seek_to     REAL,                              -- pending seek target (null = none)
+                position_at REAL                               -- server clock when position was recorded
             );
 
             INSERT OR IGNORE INTO player_state (id, status, volume, seq)
@@ -103,6 +105,7 @@ def init_db():
             "ALTER TABLE player_state ADD COLUMN position REAL NOT NULL DEFAULT 0",
             "ALTER TABLE player_state ADD COLUMN duration REAL NOT NULL DEFAULT 0",
             "ALTER TABLE player_state ADD COLUMN seek_to  REAL",
+            "ALTER TABLE player_state ADD COLUMN position_at REAL",
         ]:
             try:
                 db.execute(_col)
@@ -378,26 +381,42 @@ def advance(db):
     if nxt:
         db.execute("UPDATE queue SET status='playing' WHERE id=?", (nxt["id"],))
         db.execute("UPDATE player_state SET status='playing', seek_to=NULL, "
-                   "position=0, duration=0 WHERE id=1")
+                   "position=0, duration=0, position_at=? WHERE id=1", (time.time(),))
     else:
         db.execute("UPDATE player_state SET status='stopped', seek_to=NULL, "
-                   "position=0, duration=0 WHERE id=1")
+                   "position=0, duration=0, position_at=? WHERE id=1", (time.time(),))
+
+
+def _extrapolate(st):
+    """The host only reports its position every few seconds — extrapolate
+    from the server clock so any client (a fresh tablet join, or an
+    already-playing one correcting drift) gets an accurate "right now"
+    position instead of a stale one."""
+    pos = st["position"] or 0
+    dur = st["duration"] or 0
+    at = st["position_at"]
+    if st["status"] == "playing" and at:
+        pos += max(0, time.time() - at)
+        if dur:
+            pos = min(pos, dur)
+    return pos, dur
 
 
 @app.route("/api/player/state")
 def api_player_state():
     db = get_db()
     st = db.execute(
-        "SELECT status, volume, seq, position, duration, seek_to "
+        "SELECT status, volume, seq, position, duration, seek_to, position_at "
         "FROM player_state WHERE id=1"
     ).fetchone()
     cur = current_playing(db)
+    pos, dur = _extrapolate(st)
     return jsonify(
         status=st["status"],
         volume=st["volume"],
         seq=st["seq"],
-        position=st["position"] or 0,
-        duration=st["duration"] or 0,
+        position=pos,
+        duration=dur,
         seek_to=st["seek_to"],
         current=dict(cur) if cur else None,
     )
@@ -439,9 +458,11 @@ def api_player_command():
             seek_to = float(data.get("value", 0))
         except (TypeError, ValueError):
             abort(400)
-        db.execute("UPDATE player_state SET seek_to=? WHERE id=1", (seek_to,))
+        db.execute("UPDATE player_state SET seek_to=?, position=?, position_at=? "
+                   "WHERE id=1", (seek_to, seek_to, time.time()))
     elif action == "restart":
-        db.execute("UPDATE player_state SET seek_to=0, status='playing' WHERE id=1")
+        db.execute("UPDATE player_state SET seek_to=0, status='playing', "
+                   "position=0, position_at=? WHERE id=1", (time.time(),))
     else:
         abort(400)
 
@@ -471,8 +492,8 @@ def api_player_position():
     except (TypeError, ValueError):
         abort(400)
     db = get_db()
-    db.execute("UPDATE player_state SET position=?, duration=? WHERE id=1",
-               (pos, dur))
+    db.execute("UPDATE player_state SET position=?, duration=?, position_at=? WHERE id=1",
+               (pos, dur, time.time()))
     db.commit()
     return jsonify(ok=True)
 

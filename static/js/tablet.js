@@ -233,11 +233,19 @@ async function _loadNow() {
     if (st.current.queue_id !== currentQueueId) {
       await loadSong(st.current, st.position);
     } else {
-      if (st.seek_to != null) {
-        activeMedia().currentTime = st.seek_to;
-        api("/api/player/seeked", { method: "POST" }).catch(() => {});
-      }
       const m = activeMedia();
+      if (st.seek_to != null) {
+        m.currentTime = st.seek_to;
+        api("/api/player/seeked", { method: "POST" }).catch(() => {});
+      } else if (st.status === "playing" && !m.seeking && isFinite(m.currentTime) &&
+                 Math.abs(m.currentTime - st.position) > 1.5) {
+        // Continuous drift correction: the tablet's own clock can wander
+        // from the host's (buffering stalls, a backgrounded/throttled tab,
+        // etc.) — the host's extrapolated position is now accurate enough
+        // to just gently pull it back in line rather than letting it drift.
+        m.currentTime = st.position;
+      }
+
       if (st.status === "playing" && m.paused && !songEnded) {
         m.play().catch(() => {});
       } else if (st.status === "paused" && !m.paused) {

@@ -130,6 +130,7 @@ def init_schema():
         "ALTER TABLE player_state ADD COLUMN position REAL NOT NULL DEFAULT 0",
         "ALTER TABLE player_state ADD COLUMN duration REAL NOT NULL DEFAULT 0",
         "ALTER TABLE player_state ADD COLUMN seek_to  REAL",
+        "ALTER TABLE player_state ADD COLUMN position_at REAL",
     ]:
         try:
             execute(_col)
