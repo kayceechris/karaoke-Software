@@ -238,7 +238,7 @@ async function _loadNow() {
         m.currentTime = st.seek_to;
         api("/api/player/seeked", { method: "POST" }).catch(() => {});
       } else if (st.status === "playing" && !m.seeking && isFinite(m.currentTime) &&
-                 Math.abs(m.currentTime - st.position) > 0.6) {
+                 Math.abs(m.currentTime - st.position) > 1.5) {
         // Continuous drift correction: the tablet's own clock can wander
         // from the host's (buffering stalls, a backgrounded/throttled tab,
         // etc.) — the host's extrapolated position is now accurate enough
@@ -286,9 +286,9 @@ qEl.addEventListener("input", () => {
 search();
 loadQueue();
 loadNow();
-// Tighter than the 1s default: the host's TV plays its video from a local
-// file (near-instant start), while a tablet's video streams over the
-// network from R2 — every millisecond of detection delay here adds
-// directly to how far behind the host's audio the tablet looks.
-setInterval(loadNow, 400);
+// Polling faster than this made drift-correction re-seeks frequent enough
+// to visibly jump the video/lyrics while someone was following along —
+// once a second is a smoother trade-off even if it's a bit slower to
+// notice a new song.
+setInterval(loadNow, 1000);
 setInterval(loadQueue, 4000);
