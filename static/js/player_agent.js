@@ -68,7 +68,10 @@ function reportPosition() {
     body: JSON.stringify({ position: m.currentTime, duration: m.duration }),
   }).catch(() => {});
 }
-setInterval(reportPosition, 3000);
+// Tighter than before: tablets extrapolate a "live" position from
+// whenever this last reported, so the less stale this is, the less any
+// tablet can drift ahead of the host in between reports.
+setInterval(reportPosition, 1000);
 
 async function loadSong(it) {
   currentQueueId = it.queue_id;
