@@ -4,6 +4,9 @@ __pycache__/
 .venv/
 venv/
 
+# Dedicated Chromium profile for the auto-launched player
+.player-profile/
+
 # Local databases (recreated automatically)
 *.db
 

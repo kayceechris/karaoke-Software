@@ -291,10 +291,19 @@ def launch_player():
         webbrowser.open(f"http://127.0.0.1:{AGENT_PORT}/player")
         return
     url = f"http://127.0.0.1:{AGENT_PORT}/player?autoplay=1"
+    # --autoplay-policy (and most other flags) only take effect when this is
+    # the first process of the browser to start — if Edge/Chrome is already
+    # running for anything else, a plain launch just opens a new window in
+    # that existing process and silently ignores the flag, so sound would
+    # still need a real click. A dedicated profile dir forces a genuinely
+    # separate instance where the flag actually applies.
+    profile_dir = os.path.join(BASE_DIR, ".player-profile")
     subprocess.Popen([
         browser, f"--app={url}",
         "--autoplay-policy=no-user-gesture-required",
         "--start-fullscreen", "--new-window",
+        f"--user-data-dir={profile_dir}",
+        "--no-first-run", "--no-default-browser-check",
     ])
 
 

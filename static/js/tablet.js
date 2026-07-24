@@ -252,7 +252,13 @@ async function _loadNow() {
           m.currentTime = st.position;
           m.playbackRate = 1;
         } else if (Math.abs(drift) > 0.3) {
-          m.playbackRate = drift > 0 ? 0.97 : 1.03;
+          // Scale the correction with how far off it is — a fixed small
+          // nudge isn't necessarily strong enough for the true underlying
+          // rate mismatch, but a big one would be audible/visible for tiny
+          // drift. Ramps from barely-there up to a firm (but still not
+          // jarring) pull as drift approaches the hard-snap threshold.
+          const correction = Math.min(0.2, Math.abs(drift) * 0.08);
+          m.playbackRate = drift > 0 ? 1 - correction : 1 + correction;
         } else if (m.playbackRate !== 1) {
           m.playbackRate = 1;
         }
