@@ -113,6 +113,13 @@ async function loadSong(it) {
 
 function activeMedia() { return currentKind === "video" ? video : audio; }
 
+// The host plays a local file (near-instant start) while a guest tablet has
+// to fetch its video over the network from R2 (real start-up latency) — so
+// even if both notice a new song at the same moment, the host would still
+// win the race. Holding the host back briefly gives the tablet's fetch a
+// head start instead of trying to make the tablet start impossibly fast.
+const HOST_START_DELAY_MS = 1000;
+
 let polling = false;
 async function poll() {
   if (polling) return;        // don't overlap: a slow cloud reply could double-load
@@ -138,7 +145,11 @@ async function poll() {
       hideAll();
       return;
     }
-    if (state.current.queue_id !== currentQueueId) { await loadSong(state.current); return; }
+    if (state.current.queue_id !== currentQueueId) {
+      await new Promise((r) => setTimeout(r, HOST_START_DELAY_MS));
+      await loadSong(state.current);
+      return;
+    }
 
     if (state.seek_to != null) {
       activeMedia().currentTime = state.seek_to;
