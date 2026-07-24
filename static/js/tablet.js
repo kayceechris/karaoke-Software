@@ -240,27 +240,16 @@ async function _loadNow() {
         m.playbackRate = 1;
         api("/api/player/seeked", { method: "POST" }).catch(() => {});
       } else if (st.status === "playing" && !m.seeking && isFinite(m.currentTime)) {
-        // A tablet's decoder can genuinely run at a slightly different
-        // effective rate than the host's — a periodic hard position-jump
-        // can't fix that (it just re-drifts at the same wrong rate between
-        // corrections, and visibly jumps the picture each time). Nudge
-        // playbackRate instead: a barely perceptible speed tweak that
-        // continuously pulls it back in line. Reserve the hard jump for a
-        // drift big enough that nudging would take too long to catch up.
-        const drift = m.currentTime - st.position;
-        if (Math.abs(drift) > 3) {
+        // playbackRate nudging isn't reliable enough across devices — some
+        // Android hardware video decode paths don't honor fine-grained
+        // rate changes, so a genuine decoder-speed mismatch just kept
+        // accumulating unchecked. Correcting position directly every poll
+        // (currentTime seeking works everywhere) instead: catching drift
+        // early and often keeps each individual correction small rather
+        // than letting it build up into an occasional big, visible jump.
+        if (m.playbackRate !== 1) m.playbackRate = 1;
+        if (Math.abs(m.currentTime - st.position) > 0.4) {
           m.currentTime = st.position;
-          m.playbackRate = 1;
-        } else if (Math.abs(drift) > 0.3) {
-          // Scale the correction with how far off it is — a fixed small
-          // nudge isn't necessarily strong enough for the true underlying
-          // rate mismatch, but a big one would be audible/visible for tiny
-          // drift. Ramps from barely-there up to a firm (but still not
-          // jarring) pull as drift approaches the hard-snap threshold.
-          const correction = Math.min(0.2, Math.abs(drift) * 0.08);
-          m.playbackRate = drift > 0 ? 1 - correction : 1 + correction;
-        } else if (m.playbackRate !== 1) {
-          m.playbackRate = 1;
         }
       }
 
