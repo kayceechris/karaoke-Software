@@ -158,6 +158,7 @@ async function loadSong(it, startAt) {
   idle.style.display = "none";
 
   video.pause(); audio.pause();
+  video.playbackRate = 1; audio.playbackRate = 1;
   video.removeAttribute("src"); video.load();
 
   // Join an already-playing song where it currently is, rather than
@@ -203,10 +204,10 @@ async function loadSong(it, startAt) {
 
 let _loadNowBusy = false;
 async function loadNow() {
-  // Guard against overlap: at a 400ms poll interval, a slow response could
-  // still be in flight when the next tick fires. Without this, an older
-  // response landing after a newer one could see a stale queue_id and
-  // "helpfully" switch back to the song that's no longer playing.
+  // Guard against overlap: a slow response could still be in flight when
+  // the next tick fires. Without this, an older response landing after a
+  // newer one could see a stale queue_id and "helpfully" switch back to
+  // the song that's no longer playing.
   if (_loadNowBusy) return;
   _loadNowBusy = true;
   try {
@@ -236,14 +237,25 @@ async function _loadNow() {
       const m = activeMedia();
       if (st.seek_to != null) {
         m.currentTime = st.seek_to;
+        m.playbackRate = 1;
         api("/api/player/seeked", { method: "POST" }).catch(() => {});
-      } else if (st.status === "playing" && !m.seeking && isFinite(m.currentTime) &&
-                 Math.abs(m.currentTime - st.position) > 1.5) {
-        // Continuous drift correction: the tablet's own clock can wander
-        // from the host's (buffering stalls, a backgrounded/throttled tab,
-        // etc.) — the host's extrapolated position is now accurate enough
-        // to just gently pull it back in line rather than letting it drift.
-        m.currentTime = st.position;
+      } else if (st.status === "playing" && !m.seeking && isFinite(m.currentTime)) {
+        // A tablet's decoder can genuinely run at a slightly different
+        // effective rate than the host's — a periodic hard position-jump
+        // can't fix that (it just re-drifts at the same wrong rate between
+        // corrections, and visibly jumps the picture each time). Nudge
+        // playbackRate instead: a barely perceptible speed tweak that
+        // continuously pulls it back in line. Reserve the hard jump for a
+        // drift big enough that nudging would take too long to catch up.
+        const drift = m.currentTime - st.position;
+        if (Math.abs(drift) > 3) {
+          m.currentTime = st.position;
+          m.playbackRate = 1;
+        } else if (Math.abs(drift) > 0.3) {
+          m.playbackRate = drift > 0 ? 0.97 : 1.03;
+        } else if (m.playbackRate !== 1) {
+          m.playbackRate = 1;
+        }
       }
 
       if (st.status === "playing" && m.paused && !songEnded) {
