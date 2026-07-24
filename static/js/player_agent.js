@@ -118,7 +118,7 @@ function activeMedia() { return currentKind === "video" ? video : audio; }
 // even if both notice a new song at the same moment, the host would still
 // win the race. Holding the host back briefly gives the tablet's fetch a
 // head start instead of trying to make the tablet start impossibly fast.
-const HOST_START_DELAY_MS = 1000;
+const HOST_START_DELAY_MS = 200;
 
 let polling = false;
 async function poll() {
