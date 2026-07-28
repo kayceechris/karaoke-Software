@@ -62,11 +62,21 @@ function showOverlay(it) {
 
 function onEnded() {
   songEnded = true;
-  fetch("/api/ended", { method: "POST" }).catch(() => {});
+  // Only the sanctioned host instance is authoritative here — it's driving
+  // the actual show, so its video finishing really does mean the song is
+  // over. A non-host viewer's video can reach its own end first (any small
+  // drift, uncorrected now, adds up over a song) and must NOT be allowed to
+  // advance the queue for everyone and cut the host off mid-song.
+  if (IS_HOST_INSTANCE) {
+    fetch("/api/ended", { method: "POST" }).catch(() => {});
+  }
 }
 
 function reportPosition() {
-  if (!currentQueueId) return;
+  // Host-only, same reasoning as onEnded above — a non-host viewer's own
+  // (uncorrected, possibly drifting) position must not overwrite the shared
+  // state that everyone else's mid-song joins and the admin seek bar rely on.
+  if (!IS_HOST_INSTANCE || !currentQueueId) return;
   const m = activeMedia();
   if (!m || !isFinite(m.duration) || m.duration === 0) return;
   fetch("/api/position", {
@@ -163,9 +173,13 @@ async function poll() {
     const m = activeMedia();
     if (state.seek_to != null) {
       // An explicit admin seek/restart — everyone follows this, host and
-      // viewers alike.
+      // viewers alike. Only the host acknowledges it, though: if a viewer's
+      // ack cleared seek_to first, the host could miss applying it entirely
+      // on its own next poll.
       m.currentTime = state.seek_to;
-      fetch("/api/seeked", { method: "POST" }).catch(() => {});
+      if (IS_HOST_INSTANCE) {
+        fetch("/api/seeked", { method: "POST" }).catch(() => {});
+      }
     }
     // No passive drift correction here: a non-host viewer already joined at
     // the right position when the song loaded (see loadSong's seekOnceReady)
