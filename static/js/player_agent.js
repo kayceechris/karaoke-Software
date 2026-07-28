@@ -162,16 +162,16 @@ async function poll() {
 
     const m = activeMedia();
     if (state.seek_to != null) {
+      // An explicit admin seek/restart — everyone follows this, host and
+      // viewers alike.
       m.currentTime = state.seek_to;
       fetch("/api/seeked", { method: "POST" }).catch(() => {});
-    } else if (!IS_HOST_INSTANCE && state.status === "playing" && !m.seeking &&
-               isFinite(m.currentTime) && Math.abs(m.currentTime - state.position) > 0.4) {
-      // Drift correction only for a non-sanctioned viewer of this same URL.
-      // The host instance IS the source of truth feeding the live PA sound
-      // — seeking it against itself would just click/glitch the actual show
-      // audio for no reason.
-      m.currentTime = state.position;
     }
+    // No passive drift correction here: a non-host viewer already joined at
+    // the right position when the song loaded (see loadSong's seekOnceReady)
+    // and just keeps playing from there — it still follows song changes and
+    // play/pause/stop below, but isn't repeatedly re-synced against the
+    // host's position.
 
     if (state.status === "playing" && m.paused && unlocked && !songEnded) m.play().catch(() => {});
     else if (state.status === "paused" && !m.paused) m.pause();
@@ -186,14 +186,4 @@ function renderLoop() {
   requestAnimationFrame(renderLoop);
 }
 requestAnimationFrame(renderLoop);
-
-// The sanctioned host instance drives the actual show — it needs to keep
-// following play/pause/next/stop commands and song changes continuously.
-// Anyone else opening this same URL is just a supplementary viewer; check
-// what's currently playing once and leave it at that, rather than
-// repeatedly polling a device that isn't the source of truth for anything.
-if (IS_HOST_INSTANCE) {
-  setInterval(poll, 1000);
-} else {
-  poll();
-}
+setInterval(poll, 1000);
