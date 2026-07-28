@@ -186,4 +186,14 @@ function renderLoop() {
   requestAnimationFrame(renderLoop);
 }
 requestAnimationFrame(renderLoop);
-setInterval(poll, 1000);
+
+// The sanctioned host instance drives the actual show — it needs to keep
+// following play/pause/next/stop commands and song changes continuously.
+// Anyone else opening this same URL is just a supplementary viewer; check
+// what's currently playing once and leave it at that, rather than
+// repeatedly polling a device that isn't the source of truth for anything.
+if (IS_HOST_INSTANCE) {
+  setInterval(poll, 1000);
+} else {
+  poll();
+}
