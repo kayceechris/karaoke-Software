@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Melbourne Karaoke — Scan to request</title>
+  <title>Melbourne Karaoke — {{ heading|default("Scan to request") }}</title>
   <link rel="icon" href="/static/img/logo.png">
   <link rel="stylesheet" href="/static/css/style.css">
   <style>
@@ -45,13 +45,12 @@
     <h1>Melbourne Karaoke</h1>
     <div class="sub">Live song requests</div>
 
-    <div class="qcard"><img src="/qr.svg" alt="Scan to request a song"></div>
+    <div class="qcard"><img src="{{ qr_src|default('/qr.svg') }}" alt="{{ heading|default('Scan to request a song') }}"></div>
 
-    <div class="scan">📱 Scan to request a song</div>
+    <div class="scan">{{ scan_label|default('📱 Scan to request a song') }}</div>
     <div class="url">{{ url }}</div>
     <div class="steps">
-      1. Open your phone camera &nbsp;·&nbsp; 2. Point at the code<br>
-      3. Tap the link &nbsp;·&nbsp; 4. Search &amp; add your song 🎶
+      {{ steps|default('1. Open your phone camera &nbsp;·&nbsp; 2. Point at the code<br>3. Tap the link &nbsp;·&nbsp; 4. Search &amp; add your song \U0001f3b6')|safe }}
     </div>
 
     <div class="noprint">

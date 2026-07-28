@@ -72,7 +72,7 @@ def home():
 
 @app.route("/tablet")
 def tablet():
-    return render_template("tablet.html", r2_base_url=R2_PUBLIC_BASE_URL)
+    return render_template("tablet.html")
 
 
 @app.route("/admin")
@@ -82,7 +82,10 @@ def admin():
 
 @app.route("/player")
 def player_info():
-    # The real player runs on the laptop agent; the cloud can't play local files.
+    # Real video needs R2 configured (the agent mirrors songs there) — until
+    # then there's nothing for the cloud to actually play.
+    if R2_PUBLIC_BASE_URL:
+        return render_template("cloud_player.html", r2_base_url=R2_PUBLIC_BASE_URL)
     return render_template("cloud_player_info.html")
 
 
@@ -108,26 +111,51 @@ def admin_manifest():
                      mimetype="application/manifest+json")
 
 
-# ---- QR code: printable poster guests scan to open /tablet ----
-def _tablet_url():
+# ---- QR codes: printable posters guests scan to open /tablet or /player ----
+def _page_url(path):
     # Render terminates TLS upstream, so trust the forwarded scheme for https.
     scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
-    return f"{scheme}://{request.host}/tablet"
+    return f"{scheme}://{request.host}{path}"
 
 
-@app.route("/qr.svg")
-def qr_svg():
-    img = qrcode.make(_tablet_url(),
-                      image_factory=qrcode.image.svg.SvgPathImage,
+def _tablet_url():
+    return _page_url("/tablet")
+
+
+def _qr_svg_response(url):
+    img = qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage,
                       box_size=12, border=2)
     buf = io.BytesIO()
     img.save(buf)
     return Response(buf.getvalue(), mimetype="image/svg+xml")
 
 
+@app.route("/qr.svg")
+def qr_svg():
+    return _qr_svg_response(_tablet_url())
+
+
 @app.route("/qr")
 def qr_page():
-    return render_template("qr.html", url=_tablet_url())
+    return render_template("qr.html", url=_tablet_url(), qr_src="/qr.svg",
+                           heading="Scan to request a song",
+                           scan_label="📱 Scan to request a song",
+                           steps="1. Open your phone camera &nbsp;·&nbsp; 2. Point at the code<br>"
+                                 "3. Tap the link &nbsp;·&nbsp; 4. Search &amp; add your song 🎶")
+
+
+@app.route("/qr-player.svg")
+def qr_player_svg():
+    return _qr_svg_response(_page_url("/player"))
+
+
+@app.route("/qr-player")
+def qr_player_page():
+    return render_template("qr.html", url=_page_url("/player"), qr_src="/qr-player.svg",
+                           heading="Scan to watch",
+                           scan_label="📺 Scan to watch the show",
+                           steps="1. Open your phone camera &nbsp;·&nbsp; 2. Point at the code<br>"
+                                 "3. Tap the link — video only, sound plays from the venue speakers 🔇")
 
 
 # --------------------------------------------------------------------------

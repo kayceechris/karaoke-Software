@@ -229,21 +229,6 @@ input[type="search"]:focus, input[type="text"]:focus {
 .statuspill.playing { color: #71ffb0; background: rgba(45, 230, 130, .12); border-color: rgba(45, 230, 130, .3); }
 .statuspill.stopped { color: var(--muted); background: rgba(255, 255, 255, .05); border-color: var(--border); }
 
-/* ---- live player (guest tablet) ---- */
-.player-box {
-  position: sticky; top: var(--header-h, 64px); z-index: 15;
-  overflow: hidden; aspect-ratio: 16 / 9;
-  border-radius: 18px; margin-bottom: 14px;
-  background: #000; border: 1px solid var(--border); box-shadow: var(--shadow);
-  display: flex; align-items: center; justify-content: center;
-  animation: cardIn .4s ease both;
-}
-.player-box video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-.player-box canvas { image-rendering: pixelated; height: 100%; aspect-ratio: 300 / 216; }
-.player-box #idle {
-  color: var(--muted); text-align: center; font-size: 14px; padding: 0 20px;
-}
-
 /* ---- admin transport ---- */
 .transport { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 18px 0; }
 .tbtn {
