@@ -44,37 +44,33 @@ local file on the TV.
 - **Host:** open `https://<your-cloud-url>/admin`, enter the `HOST_TOKEN` once, control playback.
 - Add/remove song files on the laptop, then restart the agent (or `POST /api/resync`) to refresh.
 
-### Optional: real video on the guest tablet (Cloudflare R2)
+### Optional: a "watch" link/QR on the cloud tablet
 
-By default the cloud `/tablet` only shows text ("now playing" title/singer) —
-guests' phones have no way to reach video files that live only on your
-laptop. To show the actual karaoke video at the top of `/tablet`, mirror your
-song files to Cloudflare R2 (free tier: 10GB storage, **zero egress fees**,
-which matters since every guest view is a full video download):
+`/tablet` is text-only (title/singer, no video) — the real picture and sound
+belong on the laptop's own player, driven straight off local files. If you
+want guests to be able to open that same player (muted — the host instance
+is the only one with real sound) from their own phone while on the venue
+Wi‑Fi, point the cloud at it:
 
-1. Cloudflare dashboard → **R2** → create a bucket (any name).
-2. Bucket → **Settings** → **Public access** → enable the public dev URL
-   (`https://pub-xxxxxxxx.r2.dev`) or attach a custom domain. Copy that base URL.
-3. **R2** → **Manage API tokens** → create a token scoped to that bucket
-   (read + write). Copy the **Access Key ID** and **Secret Access Key**, and
-   note your **Account ID** (shown on the R2 overview page).
-4. On the **laptop**, edit [start_agent.bat](start_agent.bat) and fill in
-   `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`,
-   **and** `R2_PUBLIC_BASE_URL` (the agent uses this to check which files are
-   already uploaded, not just to serve them).
-5. On **Render**, open the service → **Environment** → add `R2_PUBLIC_BASE_URL`
-   too (the public URL from step 2, no trailing slash).
-6. Restart the agent. It mirrors every song to R2 in the background (logged
-   as `[r2] uploaded ...`) — safe to leave running, already-uploaded files are
-   skipped on future restarts/resyncs, so only new songs take time to upload.
+1. Start the agent and note the URL it prints, e.g. `http://192.168.1.23:5050/player`.
+2. On **Render**, open the service → **Environment** → add `LOCAL_PLAYER_URL`
+   set to that exact URL. (It's a private LAN address — the cloud can't
+   discover it on its own, and it'll change if the laptop joins a different
+   network, so update this each event if needed.)
+3. `/tablet` now shows a **📺 Cloud Player** button next to Install, and
+   `/qr-player` gives you a printable "scan to watch" poster — both open the
+   laptop's player directly. Only works for guests on the same Wi‑Fi as the
+   laptop; leave `LOCAL_PLAYER_URL` unset to hide both.
 
-Leave any `R2_*` var blank/unset to skip this entirely — everything else
-works exactly as before, just without video on the cloud tablet.
+### Optional: mirror songs to Cloudflare R2
 
-**Known limits:** a brand-new song only has video on the cloud tablet once
-its upload finishes (bounded by your home upload speed); removing a local
-file doesn't delete it from R2 (clean up manually in the Cloudflare dashboard
-if you care about the free-tier storage cap).
+`agent.py` can also mirror your song files to Cloudflare R2 in the
+background (free tier: 10GB storage, zero egress fees) via `R2_ACCOUNT_ID`,
+`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, and
+`R2_PUBLIC_BASE_URL` (set on both the laptop and Render — see
+[r2_storage.py](r2_storage.py)). Nothing in the current UI serves video from
+it, but `cloud_app.py`'s `/media/<id>` still redirects there if you build
+something that needs it. Leave unset to skip entirely.
 
 ---
 
@@ -141,7 +137,8 @@ Downloads karaoke videos as `Artist - Title.mp4` into `songs/`. Re-run the agent
 | `CLOUD_URL` | agent | URL of the deployed cloud brain |
 | `KARAOKE_SONGS_DIR` | agent / offline | Songs folder (default `./songs`) |
 | `AGENT_PORT` / `KARAOKE_PORT` | agent / offline | Local port (5050 / 5000) |
-| `R2_PUBLIC_BASE_URL` | cloud + agent | Public R2 bucket URL. Needed on **both**: cloud uses it to redirect `/media`, agent uses it to check which files are already uploaded. Unset → cloud `/tablet` has no video (text only) |
+| `LOCAL_PLAYER_URL` | cloud | The agent's LAN player URL (e.g. `http://192.168.1.23:5050/player`), printed at agent startup. Unset → no Cloud Player button/QR on `/tablet` |
+| `R2_PUBLIC_BASE_URL` | cloud + agent | Public R2 bucket URL. Cloud uses it for `/media` redirects (unused by the current UI); agent uses it to check which files are already uploaded |
 | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | agent | Credentials the agent uses to mirror songs to R2. All optional — unset skips media sync entirely |
 
 ## Troubleshooting

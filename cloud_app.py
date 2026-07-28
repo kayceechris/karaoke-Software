@@ -35,6 +35,10 @@ import db
 
 HOST_TOKEN = os.environ.get("HOST_TOKEN", "")
 R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL", "").rstrip("/")
+# The agent's LAN player URL (e.g. http://192.168.1.23:5050/player), printed
+# in its startup banner. The cloud can't discover this on its own — it's a
+# private IP that changes per network — so the host sets it once per event.
+LOCAL_PLAYER_URL = os.environ.get("LOCAL_PLAYER_URL", "").rstrip("/")
 LRCLIB_UA = "MelbourneKaraoke/1.0 (+https://karaoke-t33m.onrender.com)"
 _LYRICS_CACHE = {}  # song_id -> result dict (lyrics don't change during an event)
 
@@ -67,12 +71,13 @@ def require_host(fn):
 @app.route("/")
 def home():
     return render_template("cloud_home.html",
-                           public_url=request.url_root.rstrip("/"))
+                           public_url=request.url_root.rstrip("/"),
+                           local_player_url=LOCAL_PLAYER_URL)
 
 
 @app.route("/tablet")
 def tablet():
-    return render_template("tablet.html")
+    return render_template("tablet.html", local_player_url=LOCAL_PLAYER_URL)
 
 
 @app.route("/admin")
@@ -82,10 +87,7 @@ def admin():
 
 @app.route("/player")
 def player_info():
-    # Real video needs R2 configured (the agent mirrors songs there) — until
-    # then there's nothing for the cloud to actually play.
-    if R2_PUBLIC_BASE_URL:
-        return render_template("cloud_player.html", r2_base_url=R2_PUBLIC_BASE_URL)
+    # The real player runs on the laptop agent; the cloud can't play local files.
     return render_template("cloud_player_info.html")
 
 
@@ -146,16 +148,21 @@ def qr_page():
 
 @app.route("/qr-player.svg")
 def qr_player_svg():
-    return _qr_svg_response(_page_url("/player"))
+    if not LOCAL_PLAYER_URL:
+        abort(404)
+    return _qr_svg_response(LOCAL_PLAYER_URL)
 
 
 @app.route("/qr-player")
 def qr_player_page():
-    return render_template("qr.html", url=_page_url("/player"), qr_src="/qr-player.svg",
-                           heading="Scan to watch",
-                           scan_label="📺 Scan to watch the show",
+    if not LOCAL_PLAYER_URL:
+        abort(404)
+    return render_template("qr.html", url=LOCAL_PLAYER_URL, qr_src="/qr-player.svg",
+                           heading="Scan for the player",
+                           scan_label="📺 Scan to open the player",
                            steps="1. Open your phone camera &nbsp;·&nbsp; 2. Point at the code<br>"
-                                 "3. Tap the link — video only, sound plays from the venue speakers 🔇")
+                                 "3. Tap the link — video only, sound plays from the venue speakers 🔇 "
+                                 "(must be on the same Wi‑Fi as the host laptop)")
 
 
 # --------------------------------------------------------------------------

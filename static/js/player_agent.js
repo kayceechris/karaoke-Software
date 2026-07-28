@@ -77,12 +77,23 @@ function reportPosition() {
 }
 setInterval(reportPosition, 3000);
 
-async function loadSong(it) {
+async function loadSong(it, startAt) {
   currentQueueId = it.queue_id;
   currentKind = it.kind;
   cdgActive = false;
   songEnded = false;
   idle.style.display = "none";
+
+  // Join an already-playing song where it currently is, rather than
+  // restarting it from 0:00 — matters whenever this page is (re)opened
+  // mid-song, whether that's the host agent recovering or someone else on
+  // the Wi-Fi opening the same URL.
+  const seekTo = startAt || 0;
+  function seekOnceReady(m) {
+    if (seekTo <= 0) return;
+    if (m.readyState >= 1) { m.currentTime = seekTo; return; }
+    m.addEventListener("loadedmetadata", () => { m.currentTime = seekTo; }, { once: true });
+  }
 
   if (it.kind === "video") {
     // Pause and release audio so it doesn't keep buffering in background
@@ -93,6 +104,7 @@ async function loadSong(it) {
     video.src = mediaUrl(it.song_key, false);   // browser aborts old + starts new immediately
     video.volume = volume;
     video.onended = onEnded;
+    seekOnceReady(video);
     if (unlocked) video.play().catch(() => {});
   } else {
     // Pause and release video
@@ -102,6 +114,7 @@ async function loadSong(it) {
     audio.src = mediaUrl(it.song_key, false);   // start buffering audio right away
     audio.volume = volume;
     audio.onended = onEnded;
+    seekOnceReady(audio);
     if (it.kind === "cdg") {
       canvas.style.display = "";
       try {
@@ -145,14 +158,21 @@ async function poll() {
       hideAll();
       return;
     }
-    if (state.current.queue_id !== currentQueueId) { await loadSong(state.current); return; }
-
-    if (state.seek_to != null) {
-      activeMedia().currentTime = state.seek_to;
-      fetch("/api/seeked", { method: "POST" }).catch(() => {});
-    }
+    if (state.current.queue_id !== currentQueueId) { await loadSong(state.current, state.position); return; }
 
     const m = activeMedia();
+    if (state.seek_to != null) {
+      m.currentTime = state.seek_to;
+      fetch("/api/seeked", { method: "POST" }).catch(() => {});
+    } else if (!IS_HOST_INSTANCE && state.status === "playing" && !m.seeking &&
+               isFinite(m.currentTime) && Math.abs(m.currentTime - state.position) > 0.4) {
+      // Drift correction only for a non-sanctioned viewer of this same URL.
+      // The host instance IS the source of truth feeding the live PA sound
+      // — seeking it against itself would just click/glitch the actual show
+      // audio for no reason.
+      m.currentTime = state.position;
+    }
+
     if (state.status === "playing" && m.paused && unlocked && !songEnded) m.play().catch(() => {});
     else if (state.status === "paused" && !m.paused) m.pause();
     else if (state.status === "stopped") m.pause();
