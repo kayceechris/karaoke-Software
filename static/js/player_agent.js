@@ -20,6 +20,14 @@ let volume = 1.0;
 let cdgActive = false;
 let songEnded = false;
 
+// agent.py launches the ONE sanctioned host instance itself with
+// ?autoplay=1 and a Chromium flag that permits autoplay-with-sound. Anyone
+// else on the same Wi-Fi could also open this /player URL manually — mute
+// that case so they can't accidentally produce a second, conflicting audio
+// source; only the actual auto-launched host player has real sound.
+const IS_HOST_INSTANCE = new URLSearchParams(location.search).get("autoplay") === "1";
+if (!IS_HOST_INSTANCE) { video.muted = true; audio.muted = true; }
+
 async function unlock() {
   unlocked = true;
   tapstart.style.display = "none";
@@ -30,10 +38,9 @@ async function unlock() {
 
 tapstart.addEventListener("click", unlock);
 
-// agent.py launches this page itself with ?autoplay=1 and a Chromium flag
-// that permits autoplay-with-sound — skip the manual tap in that case so
-// audio starts as soon as the agent is running, nothing to click.
-if (new URLSearchParams(location.search).get("autoplay") === "1") unlock();
+// Skip the manual tap for the sanctioned host instance — audio starts as
+// soon as the agent is running, nothing to click.
+if (IS_HOST_INSTANCE) unlock();
 
 function mediaUrl(key, cdgFlag) {
   const u = "/local-media/" + key.split("/").map(encodeURIComponent).join("/");
