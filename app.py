@@ -491,9 +491,17 @@ def api_player_position():
         dur = float(data.get("duration", 0))
     except (TypeError, ValueError):
         abort(400)
+    queue_id = data.get("queue_id")
     db = get_db()
-    db.execute("UPDATE player_state SET position=?, duration=?, position_at=? WHERE id=1",
-               (pos, dur, time.time()))
+    # Guard against a stale report — e.g. the player's periodic 3s report for
+    # a song that's already been advanced past — landing right after a
+    # genuine reset (Next/ended) and clobbering the new song's fresh
+    # position=0 with old data. Only apply if it's actually for whatever is
+    # currently marked 'playing'.
+    db.execute(
+        "UPDATE player_state SET position=?, duration=?, position_at=? "
+        "WHERE id=1 AND EXISTS (SELECT 1 FROM queue WHERE id=? AND status='playing')",
+        (pos, dur, time.time(), queue_id))
     db.commit()
     return jsonify(ok=True)
 

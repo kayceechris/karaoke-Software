@@ -51,7 +51,7 @@ function reportPosition() {
   api("/api/player/position", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ position: m.currentTime, duration: m.duration }),
+    body: JSON.stringify({ position: m.currentTime, duration: m.duration, queue_id: currentQueueId }),
   }).catch(() => {});
 }
 setInterval(reportPosition, 3000);
