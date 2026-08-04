@@ -21,12 +21,32 @@ let cdgActive = false;
 let songEnded = false;
 
 // agent.py launches the ONE sanctioned host instance itself with
-// ?autoplay=1 and a Chromium flag that permits autoplay-with-sound. Anyone
-// else on the same Wi-Fi could also open this /player URL manually — mute
-// that case so they can't accidentally produce a second, conflicting audio
-// source; only the actual auto-launched host player has real sound.
+// ?autoplay=1. Anyone else on the same Wi-Fi could also open this /player
+// URL manually — that case stays muted always, so it can't accidentally
+// produce a second, conflicting audio source; only the host player has
+// real sound.
 const IS_HOST_INSTANCE = new URLSearchParams(location.search).get("autoplay") === "1";
-if (!IS_HOST_INSTANCE) { video.muted = true; audio.muted = true; }
+
+// Every instance starts muted, always — browsers allow muted autoplay
+// unconditionally, no special flags or gestures needed, unlike autoplay
+// WITH sound (which --autoplay-policy is supposed to permit but isn't
+// reliable in practice — depends on it being a genuinely fresh browser
+// process, which isn't guaranteed). The host instance unmutes itself right
+// after playback actually begins instead: toggling .muted on an
+// already-playing element doesn't require a fresh user gesture, only
+// *starting* playback with sound does — so this sidesteps the flag
+// entirely and just works.
+video.muted = true;
+audio.muted = true;
+
+function startPlayback(m) {
+  const p = m.play();
+  if (IS_HOST_INSTANCE) {
+    Promise.resolve(p).then(() => { m.muted = false; }).catch(() => {});
+  } else {
+    Promise.resolve(p).catch(() => {});
+  }
+}
 
 async function unlock() {
   unlocked = true;
@@ -119,7 +139,7 @@ async function loadSong(it, startAt) {
     video.volume = volume;
     video.onended = onEnded;
     seekOnceReady(video);
-    if (unlocked) video.play().catch(() => {});
+    if (unlocked) startPlayback(video);
   } else {
     // Pause and release video
     video.pause(); video.removeAttribute("src");
@@ -140,7 +160,7 @@ async function loadSong(it, startAt) {
     } else {
       canvas.style.display = "none";
     }
-    if (unlocked) audio.play().catch(() => {});
+    if (unlocked) startPlayback(audio);
   }
   showOverlay(it);
 }
@@ -191,7 +211,7 @@ async function poll() {
     // play/pause/stop below, but isn't repeatedly re-synced against the
     // host's position.
 
-    if (state.status === "playing" && m.paused && unlocked && !songEnded) m.play().catch(() => {});
+    if (state.status === "playing" && m.paused && unlocked && !songEnded) startPlayback(m);
     else if (state.status === "paused" && !m.paused) m.pause();
     else if (state.status === "stopped") m.pause();
   } finally {
