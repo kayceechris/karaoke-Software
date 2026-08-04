@@ -204,12 +204,18 @@ async function poll() {
       if (IS_HOST_INSTANCE) {
         fetch("/api/seeked", { method: "POST" }).catch(() => {});
       }
+    } else if (!IS_HOST_INSTANCE && state.status === "playing" && !m.seeking &&
+               isFinite(m.currentTime) && Math.abs(m.currentTime - state.position) > 2) {
+      // A non-host viewer's decoder can genuinely run at a slightly
+      // different real-world rate than the host's — same file, same bytes,
+      // but two devices' clocks don't advance media time identically. Left
+      // fully uncorrected, that gap only grows for the whole song and the
+      // viewer's video can finish before the host's does. Threshold is
+      // deliberately loose (2s) so this rarely fires and isn't visible
+      // during normal playback — it's a safety net against finishing
+      // early, not continuous tight sync.
+      m.currentTime = state.position;
     }
-    // No passive drift correction here: a non-host viewer already joined at
-    // the right position when the song loaded (see loadSong's seekOnceReady)
-    // and just keeps playing from there — it still follows song changes and
-    // play/pause/stop below, but isn't repeatedly re-synced against the
-    // host's position.
 
     if (state.status === "playing" && m.paused && unlocked && !songEnded) startPlayback(m);
     else if (state.status === "paused" && !m.paused) m.pause();
