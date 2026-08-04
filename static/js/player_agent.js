@@ -97,10 +97,14 @@ async function loadSong(it, startAt) {
   // Join an already-playing song where it currently is, rather than
   // restarting it from 0:00 — matters whenever this page is (re)opened
   // mid-song, whether that's the host agent recovering or someone else on
-  // the Wi-Fi opening the same URL.
+  // the Wi-Fi opening the same URL. Ignore anything under 2s though: a
+  // brand-new song (Next/ended) resets to position 0 on the server, but by
+  // the time this poll reads it back, server-clock extrapolation has
+  // already nudged it forward a little — without this, a fresh song would
+  // never quite start at true 0:00.
   const seekTo = startAt || 0;
   function seekOnceReady(m) {
-    if (seekTo <= 0) return;
+    if (seekTo < 2) return;
     if (m.readyState >= 1) { m.currentTime = seekTo; return; }
     m.addEventListener("loadedmetadata", () => { m.currentTime = seekTo; }, { once: true });
   }
