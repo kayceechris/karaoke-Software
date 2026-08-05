@@ -216,15 +216,24 @@ function startDrag(e, card, handle) {
 
   function onMove(ev) {
     card.style.transform = `translateY(${ev.clientY - e.clientY}px)`;
-    const siblings = [...queueEl.querySelectorAll(".queue-item:not(.playing)")];
+    // At most ONE reorder per event: a fast (especially touch) drag can
+    // cross several items' midpoints before a single pointermove fires, and
+    // checking every sibling in one pass — each check against a DOM that
+    // the previous check just mutated — could cascade into multiple moves
+    // per event, which is what caused the erratic jumping. Only ever
+    // apply the first applicable move; the next event continues it.
+    const siblings = [...queueEl.querySelectorAll(".queue-item:not(.playing)")]
+      .filter((el) => el !== card);
     for (const sib of siblings) {
-      if (sib === card) continue;
       const r = sib.getBoundingClientRect();
       const mid = r.top + r.height / 2;
-      if (ev.clientY < mid && sib.previousElementSibling === card) {
-        queueEl.insertBefore(card, sib);
-      } else if (ev.clientY > mid && sib.nextElementSibling === card) {
+      const cardIsBefore = !!(card.compareDocumentPosition(sib) & Node.DOCUMENT_POSITION_FOLLOWING);
+      if (cardIsBefore && ev.clientY > mid) {
         queueEl.insertBefore(card, sib.nextSibling);
+        break;
+      } else if (!cardIsBefore && ev.clientY < mid) {
+        queueEl.insertBefore(card, sib);
+        break;
       }
     }
   }
