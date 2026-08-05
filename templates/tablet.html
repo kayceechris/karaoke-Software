@@ -22,11 +22,9 @@
          onerror="this.onerror=null;this.src='/static/img/icon-192.png'">
     <div class="brand"><b>Melbourne Karaoke</b><span>Request a song</span></div>
     <div class="spacer"></div>
-    {% if local_player_url %}
-    <a href="{{ local_player_url }}" target="_blank">
+    <a href="/player" target="_blank">
       <button class="btn btn-ghost">📺 Cloud Player</button>
     </a>
-    {% endif %}
     <button id="installBtn" class="btn btn-ghost">⬇ Install</button>
   </header>
 

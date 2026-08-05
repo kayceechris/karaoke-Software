@@ -3,25 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Karaoke Player</title>
-  <link rel="stylesheet" href="/static/css/style.css">
+  <title>Melbourne Karaoke — Player</title>
+  <link rel="icon" href="/static/img/logo.png">
   <style>
-    html, body { height:100%; background:#000; overflow:hidden; }
+    html, body { height:100%; background:#000; overflow:hidden; margin:0; }
     #stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
     video { max-width:100%; max-height:100%; background:#000; }
     canvas { image-rendering:pixelated; height:100%; aspect-ratio:300/216; background:#000; }
-    #idle { color:#556; text-align:center; font-size:28px; font-family:"Segoe UI",sans-serif; }
+    #idle { color:#556; text-align:center; font-size:22px; font-family:"Segoe UI",sans-serif; padding:0 24px; }
     #overlay { position:fixed; left:0; right:0; bottom:0; padding:18px 26px;
       background:linear-gradient(transparent, rgba(0,0,0,.85)); color:#fff;
       font-family:"Segoe UI",sans-serif; font-size:26px; text-shadow:0 2px 6px #000; }
     #overlay small{ color:#2de2e6; font-size:16px; letter-spacing:1px; text-transform:uppercase; display:block; }
-    #unmute {
-      position:fixed; top:16px; right:16px; z-index:50;
-      display:none; align-items:center; gap:8px;
-      background:rgba(20,22,40,.85); color:#fff; border:1px solid rgba(255,255,255,.2);
-      border-radius:999px; padding:10px 16px; font-family:"Segoe UI",sans-serif; font-size:15px;
-      cursor:pointer; backdrop-filter:blur(8px);
-    }
   </style>
 </head>
 <body>
@@ -32,8 +25,7 @@
     <audio id="audio" style="display:none" preload="auto"></audio>
   </div>
   <div id="overlay" style="display:none"><small id="singer"></small><span id="title"></span></div>
-  <button id="unmute">🔇 Tap to unmute</button>
   <script src="/static/js/cdg.js"></script>
-  <script src="/static/js/player_agent.js"></script>
+  <script src="/static/js/cloud_player.js"></script>
 </body>
 </html>

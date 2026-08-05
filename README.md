@@ -53,33 +53,48 @@ pause, next, stop, restart, volume, seek) stay hidden and are rejected
 server-side even if called directly — only `HOST_TOKEN` can touch those.
 Leave unset to skip this entirely.
 
-### Optional: a "watch" link/QR on the cloud tablet
+### The Cloud Player — works for guests off the venue Wi‑Fi too
 
-`/tablet` is text-only (title/singer, no video) — the real picture and sound
-belong on the laptop's own player, driven straight off local files. If you
-want guests to be able to open that same player (muted — the host instance
-is the only one with real sound) from their own phone while on the venue
-Wi‑Fi, point the cloud at it:
+`/tablet`'s **📺 Cloud Player** button opens `/player` on the cloud itself
+(`cloud_app.py`), a muted, video-only mirror of whatever's currently
+playing. Unlike the laptop's own player, this one is reachable by anyone —
+on the venue Wi‑Fi or not — because the actual video bytes are served from
+Cloudflare R2's CDN, not relayed through the laptop. It's always a passive
+follower: it joins mid-song at the host's current position and gently
+corrects drift, but never controls playback or writes back any state.
+
+To make it actually show video, set up R2 mirroring (below) — without it,
+`/media/<id>` 404s and the button opens to a black screen with just the
+song title. It's silent by design (a second, independently-decoding stream
+per guest would drift audibly out of sync with the venue PA), so nothing
+plays audio except the actual laptop/TV setup.
+
+### Cloudflare R2 (required for the Cloud Player to show video)
+
+`agent.py` mirrors your song files to Cloudflare R2 in the background (free
+tier: 10GB storage, zero egress fees — matters since every guest view is a
+full video download) via `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+`R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (set on the laptop, in `start_agent.bat`)
+and `R2_PUBLIC_BASE_URL` (set on **both** the laptop and Render — see
+[r2_storage.py](r2_storage.py)). `cloud_app.py`'s `/media/<id>` and
+`/media/<id>/cdg` just do a DB lookup and redirect there; no bytes ever flow
+through Render itself. Leave unset to skip entirely (Cloud Player button
+still shows, just without video).
+
+### Optional: a LAN-only direct link to the laptop's own player
+
+Separately from the Cloud Player above, you can also link straight to the
+laptop's own `/player` (has real sound on the host instance) for guests
+physically on the venue Wi‑Fi:
 
 1. Start the agent and note the URL it prints, e.g. `http://192.168.1.23:5050/player`.
 2. On **Render**, open the service → **Environment** → add `LOCAL_PLAYER_URL`
    set to that exact URL. (It's a private LAN address — the cloud can't
    discover it on its own, and it'll change if the laptop joins a different
    network, so update this each event if needed.)
-3. `/tablet` now shows a **📺 Cloud Player** button next to Install, and
-   `/qr-player` gives you a printable "scan to watch" poster — both open the
-   laptop's player directly. Only works for guests on the same Wi‑Fi as the
-   laptop; leave `LOCAL_PLAYER_URL` unset to hide both.
-
-### Optional: mirror songs to Cloudflare R2
-
-`agent.py` can also mirror your song files to Cloudflare R2 in the
-background (free tier: 10GB storage, zero egress fees) via `R2_ACCOUNT_ID`,
-`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, and
-`R2_PUBLIC_BASE_URL` (set on both the laptop and Render — see
-[r2_storage.py](r2_storage.py)). Nothing in the current UI serves video from
-it, but `cloud_app.py`'s `/media/<id>` still redirects there if you build
-something that needs it. Leave unset to skip entirely.
+3. `/qr-player` gives you a printable "scan to watch" poster linking directly
+   to it. Only works for guests on the same Wi‑Fi as the laptop; leave
+   `LOCAL_PLAYER_URL` unset to skip.
 
 ---
 
@@ -147,8 +162,8 @@ Downloads karaoke videos as `Artist - Title.mp4` into `songs/`. Re-run the agent
 | `CLOUD_URL` | agent | URL of the deployed cloud brain |
 | `KARAOKE_SONGS_DIR` | agent / offline | Songs folder (default `./songs`) |
 | `AGENT_PORT` / `KARAOKE_PORT` | agent / offline | Local port (5050 / 5000) |
-| `LOCAL_PLAYER_URL` | cloud | The agent's LAN player URL (e.g. `http://192.168.1.23:5050/player`), printed at agent startup. Unset → no Cloud Player button/QR on `/tablet` |
-| `R2_PUBLIC_BASE_URL` | cloud + agent | Public R2 bucket URL. Cloud uses it for `/media` redirects (unused by the current UI); agent uses it to check which files are already uploaded |
+| `LOCAL_PLAYER_URL` | cloud | The agent's LAN player URL (e.g. `http://192.168.1.23:5050/player`), printed at agent startup. Unset → no `/qr-player` LAN-direct link |
+| `R2_PUBLIC_BASE_URL` | cloud + agent | Public R2 bucket URL. Cloud uses it for `/media` redirects that back the Cloud Player; agent uses it to check which files are already uploaded |
 | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | agent | Credentials the agent uses to mirror songs to R2. All optional — unset skips media sync entirely |
 
 ## Troubleshooting

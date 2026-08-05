@@ -9,7 +9,7 @@ const idle = document.getElementById("idle");
 const overlay = document.getElementById("overlay");
 const titleEl = document.getElementById("title");
 const singerEl = document.getElementById("singer");
-const tapstart = document.getElementById("tapstart");
+const unmuteBtn = document.getElementById("unmute");
 
 const cdg = new CDGPlayer(canvas);
 
@@ -31,11 +31,6 @@ let songEnded = false;
 const URL_PARAMS = new URLSearchParams(location.search);
 const HOST_SESSION = URL_PARAMS.get("session") || "";
 const IS_HOST_INSTANCE = HOST_SESSION !== "";
-// ?autoplay=1 is only set for the special Chromium launch with the
-// autoplay-policy flag — separate from IS_HOST_INSTANCE because the
-// no-Chromium-found fallback is still the authoritative host, it just
-// keeps the tap-to-start prompt instead of trying to skip it.
-const AUTOPLAY_REQUESTED = URL_PARAMS.get("autoplay") === "1";
 
 // Every instance starts muted, always — browsers allow muted autoplay
 // unconditionally, no special flags or gestures needed, unlike autoplay
@@ -56,21 +51,33 @@ function startPlayback(m) {
   } else {
     Promise.resolve(p).catch(() => {});
   }
+  updateUnmuteBtn();
 }
 
+function activeMedia() { return currentKind === "video" ? video : audio; }
+
+// Non-host viewers (and the rare no-Chromium-fallback host, which can't
+// auto-unmute without a prior gesture) stay muted until this is tapped —
+// a real click always satisfies the browser's gesture requirement.
+function updateUnmuteBtn() {
+  const m = activeMedia();
+  unmuteBtn.style.display = m && m.muted ? "" : "none";
+}
+unmuteBtn.addEventListener("click", () => {
+  video.muted = false;
+  audio.muted = false;
+  updateUnmuteBtn();
+});
+
+// Muted autoplay is allowed unconditionally, so this starts immediately —
+// no tap-to-start screen needed for anyone, host or guest.
 async function unlock() {
   unlocked = true;
-  tapstart.style.display = "none";
   try { await video.play().catch(() => {}); video.pause(); } catch (e) {}
   try { await audio.play().catch(() => {}); audio.pause(); } catch (e) {}
   poll();
 }
-
-tapstart.addEventListener("click", unlock);
-
-// Skip the manual tap when the agent launched us with the autoplay flag —
-// audio starts as soon as the agent is running, nothing to click.
-if (AUTOPLAY_REQUESTED) unlock();
+unlock();
 
 function mediaUrl(key, cdgFlag) {
   const u = "/local-media/" + key.split("/").map(encodeURIComponent).join("/");
@@ -181,9 +188,8 @@ async function loadSong(it, startAt, status) {
     if (unlocked && status === "playing") startPlayback(audio);
   }
   showOverlay(it);
+  updateUnmuteBtn();
 }
-
-function activeMedia() { return currentKind === "video" ? video : audio; }
 
 let polling = false;
 async function poll() {

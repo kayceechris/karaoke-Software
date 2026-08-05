@@ -101,7 +101,7 @@ def home():
 
 @app.route("/tablet")
 def tablet():
-    return render_template("tablet.html", local_player_url=LOCAL_PLAYER_URL)
+    return render_template("tablet.html")
 
 
 @app.route("/admin")
@@ -124,8 +124,11 @@ def api_admin_role():
 
 @app.route("/player")
 def player_info():
-    # The real player runs on the laptop agent; the cloud can't play local files.
-    return render_template("cloud_player_info.html")
+    # A passive, viewer-only player: media streams from R2 (the laptop agent
+    # mirrors every song there ahead of time), so this works for any guest,
+    # on or off the venue Wi-Fi — it never writes back to player_state, the
+    # laptop agent remains the only authoritative source.
+    return render_template("cloud_player.html")
 
 
 # ---- PWA: serve service worker + manifest from root scope ----
