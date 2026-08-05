@@ -466,8 +466,20 @@ def api_player_command():
             if nxt:
                 db.execute("UPDATE queue SET status='playing' WHERE id=?",
                            (nxt["id"],))
+                # Freshly promoted from idle -- position/duration can be
+                # stale leftovers from whatever was playing before the
+                # queue went idle. Reset them for the new song.
+                db.execute("UPDATE player_state SET position=0, duration=0, "
+                           "seek_to=NULL WHERE id=1")
         if current_playing(db):
-            db.execute("UPDATE player_state SET status='playing' WHERE id=1")
+            # position_at anchors _extrapolate()'s elapsed-time math -- it
+            # must be refreshed to right now on every transition to
+            # 'playing' (fresh promotion above, or resuming a paused song),
+            # otherwise the next poll adds (now - stale_position_at) on top
+            # of position, inflating it past the song's real duration after
+            # any idle time and causing an immediate seek-to-end.
+            db.execute("UPDATE player_state SET status='playing', "
+                       "position_at=? WHERE id=1", (time.time(),))
     elif action == "pause":
         db.execute("UPDATE player_state SET status='paused' WHERE id=1")
     elif action == "next":
