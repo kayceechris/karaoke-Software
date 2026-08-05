@@ -23,6 +23,7 @@ Run:  python agent.py
 """
 
 import os
+import secrets
 import shutil
 import socket
 import subprocess
@@ -41,6 +42,15 @@ CLOUD_URL = os.environ.get("CLOUD_URL", "").rstrip("/")
 HOST_TOKEN = os.environ.get("HOST_TOKEN", "")
 AGENT_PORT = int(os.environ.get("AGENT_PORT", "5050"))
 AUTO_LAUNCH_PLAYER = os.environ.get("AUTO_LAUNCH_PLAYER", "1") not in ("0", "false", "False")
+
+# Unique per process, not per song/request — restarting the agent (which
+# happens a lot: new songs, config changes, recovering from a hang) mints a
+# new one, so any player window left open from a previous run stops being
+# able to write to shared state. Without this, a stale window still polling
+# and still thinking it's authoritative can race the current one and fire
+# duplicate "song ended" signals, each one legitimately advancing the queue
+# — one click in admin then looks like it skipped several songs at once.
+HOST_SESSION = secrets.token_hex(8)
 
 VIDEO_EXTS = {".mp4", ".webm", ".m4v"}
 AUDIO_EXTS = {".mp3", ".m4a", ".ogg", ".wav"}
@@ -212,18 +222,32 @@ def api_state():
         return jsonify(unavailable=True), 200
 
 
+def _from_current_session():
+    """True only if this request carries the current process's session
+    token — rejects writes from a player window opened by a previous,
+    now-superseded agent run."""
+    data = request.get_json(silent=True) or {}
+    return data.get("session") == HOST_SESSION
+
+
 @app.route("/api/ended", methods=["POST"])
 def api_ended():
+    if not _from_current_session():
+        return jsonify(ok=True)
     return jsonify(cloud_post("/api/player/ended"))
 
 
 @app.route("/api/position", methods=["POST"])
 def api_position():
+    if not _from_current_session():
+        return jsonify(ok=True)
     return jsonify(cloud_post("/api/player/position", request.get_json(force=True)))
 
 
 @app.route("/api/seeked", methods=["POST"])
 def api_seeked():
+    if not _from_current_session():
+        return jsonify(ok=True)
     return jsonify(cloud_post("/api/player/seeked"))
 
 
@@ -288,9 +312,13 @@ def launch_player():
     if not browser:
         print("  [warn] No Edge/Chrome found — opening player in your default "
               "browser (click it once to unlock sound).")
-        webbrowser.open(f"http://127.0.0.1:{AGENT_PORT}/player")
+        # Still the authoritative host (session token), just without
+        # autoplay=1 — this browser gets no special flags, so it keeps the
+        # tap-to-start prompt instead of trying (and silently failing) to
+        # skip straight to playing.
+        webbrowser.open(f"http://127.0.0.1:{AGENT_PORT}/player?session={HOST_SESSION}")
         return
-    url = f"http://127.0.0.1:{AGENT_PORT}/player?autoplay=1"
+    url = f"http://127.0.0.1:{AGENT_PORT}/player?autoplay=1&session={HOST_SESSION}"
     # --autoplay-policy (and most other flags) only take effect when this is
     # the first process of the browser to start — if Edge/Chrome is already
     # running for anything else, a plain launch just opens a new window in

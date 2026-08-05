@@ -20,12 +20,22 @@ let volume = 1.0;
 let cdgActive = false;
 let songEnded = false;
 
-// agent.py launches the ONE sanctioned host instance itself with
-// ?autoplay=1. Anyone else on the same Wi-Fi could also open this /player
-// URL manually — that case stays muted always, so it can't accidentally
-// produce a second, conflicting audio source; only the host player has
-// real sound.
-const IS_HOST_INSTANCE = new URLSearchParams(location.search).get("autoplay") === "1";
+// agent.py launches the ONE sanctioned host instance itself with a session
+// token unique to that agent process (?session=...) — anyone else on the
+// same Wi-Fi could also open this /player URL manually, and that includes
+// a window left open from a *previous* agent run, which would otherwise
+// keep polling and writing as if it were still authoritative. Only a
+// request carrying the CURRENT process's token is accepted server-side, so
+// a stale window becomes harmless the moment the agent restarts, without
+// needing to be manually closed.
+const URL_PARAMS = new URLSearchParams(location.search);
+const HOST_SESSION = URL_PARAMS.get("session") || "";
+const IS_HOST_INSTANCE = HOST_SESSION !== "";
+// ?autoplay=1 is only set for the special Chromium launch with the
+// autoplay-policy flag — separate from IS_HOST_INSTANCE because the
+// no-Chromium-found fallback is still the authoritative host, it just
+// keeps the tap-to-start prompt instead of trying to skip it.
+const AUTOPLAY_REQUESTED = URL_PARAMS.get("autoplay") === "1";
 
 // Every instance starts muted, always — browsers allow muted autoplay
 // unconditionally, no special flags or gestures needed, unlike autoplay
@@ -58,9 +68,9 @@ async function unlock() {
 
 tapstart.addEventListener("click", unlock);
 
-// Skip the manual tap for the sanctioned host instance — audio starts as
-// soon as the agent is running, nothing to click.
-if (IS_HOST_INSTANCE) unlock();
+// Skip the manual tap when the agent launched us with the autoplay flag —
+// audio starts as soon as the agent is running, nothing to click.
+if (AUTOPLAY_REQUESTED) unlock();
 
 function mediaUrl(key, cdgFlag) {
   const u = "/local-media/" + key.split("/").map(encodeURIComponent).join("/");
@@ -88,7 +98,11 @@ function onEnded() {
   // drift, uncorrected now, adds up over a song) and must NOT be allowed to
   // advance the queue for everyone and cut the host off mid-song.
   if (IS_HOST_INSTANCE) {
-    fetch("/api/ended", { method: "POST" }).catch(() => {});
+    fetch("/api/ended", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session: HOST_SESSION }),
+    }).catch(() => {});
   }
 }
 
@@ -102,7 +116,7 @@ function reportPosition() {
   fetch("/api/position", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ position: m.currentTime, duration: m.duration, queue_id: currentQueueId }),
+    body: JSON.stringify({ position: m.currentTime, duration: m.duration, queue_id: currentQueueId, session: HOST_SESSION }),
   }).catch(() => {});
 }
 setInterval(reportPosition, 3000);
@@ -202,7 +216,11 @@ async function poll() {
       // on its own next poll.
       m.currentTime = state.seek_to;
       if (IS_HOST_INSTANCE) {
-        fetch("/api/seeked", { method: "POST" }).catch(() => {});
+        fetch("/api/seeked", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session: HOST_SESSION }),
+        }).catch(() => {});
       }
     } else if (!IS_HOST_INSTANCE && state.status === "playing" && !m.seeking &&
                isFinite(m.currentTime) && Math.abs(m.currentTime - state.position) > 2) {
