@@ -131,8 +131,24 @@ function setNow(state) {
 }
 
 let _draggingReorder = false;
+let _refreshBusy = false;
 
 async function refresh() {
+  // refresh() is now called from several places close together (a drop, a
+  // delete, the periodic timer) — without this, two overlapping calls could
+  // interleave: one clearing #queue and rebuilding it while another is
+  // still mid-way through appending its own cards, producing duplicated/
+  // ghosted-looking entries. At most one refresh runs at a time.
+  if (_refreshBusy) return;
+  _refreshBusy = true;
+  try {
+    await _refresh();
+  } finally {
+    _refreshBusy = false;
+  }
+}
+
+async function _refresh() {
   clearTimeout(_refreshTimer);
   // A drag rebuilds nothing mid-gesture — a refresh landing here would tear
   // out the very element the pointer is holding.
