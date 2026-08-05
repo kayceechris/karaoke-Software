@@ -538,15 +538,20 @@ def current_playing(cur=None):
     return db.fetchone(sql)
 
 
-def _advance(cur):
+def _advance(cur, autoplay=True):
+    """Promote the next waiting song. autoplay=False (natural song end)
+    queues it up as current but leaves playback paused, waiting for admin
+    to press Play; autoplay=True (admin clicked Next) starts it right away."""
     db.x(cur, "UPDATE queue SET status='done' WHERE status='playing'")
     db.x(cur, "SELECT id FROM queue WHERE status='waiting' "
               "ORDER BY position ASC, id ASC LIMIT 1")
     nxt = cur.fetchone()
     if nxt:
         db.x(cur, "UPDATE queue SET status='playing' WHERE id=?", (nxt["id"],))
-        db.x(cur, "UPDATE player_state SET status='playing', seek_to=NULL, "
-                  "position=0, duration=0, position_at=? WHERE id=1", (time.time(),))
+        new_status = "playing" if autoplay else "paused"
+        db.x(cur, "UPDATE player_state SET status=?, seek_to=NULL, "
+                  "position=0, duration=0, position_at=? WHERE id=1",
+             (new_status, time.time()))
     else:
         db.x(cur, "UPDATE player_state SET status='stopped', seek_to=NULL, "
                   "position=0, duration=0, position_at=? WHERE id=1", (time.time(),))
@@ -630,7 +635,7 @@ def api_player_command():
 @require_host
 def api_player_ended():
     with db.transaction() as cur:
-        _advance(cur)
+        _advance(cur, autoplay=False)
         db.x(cur, "UPDATE player_state SET seq = seq + 1, position=0, duration=0, "
                   "position_at=? WHERE id=1", (time.time(),))
     return jsonify(ok=True)

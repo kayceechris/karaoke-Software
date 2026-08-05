@@ -395,8 +395,10 @@ def current_playing(db):
     ).fetchone()
 
 
-def advance(db):
-    """Mark current playing as done and promote the next waiting song."""
+def advance(db, autoplay=True):
+    """Promote the next waiting song. autoplay=False (natural song end)
+    queues it up as current but leaves playback paused, waiting for admin
+    to press Play; autoplay=True (admin clicked Next) starts it right away."""
     db.execute("UPDATE queue SET status='done' WHERE status='playing'")
     nxt = db.execute(
         "SELECT id FROM queue WHERE status='waiting' "
@@ -404,8 +406,10 @@ def advance(db):
     ).fetchone()
     if nxt:
         db.execute("UPDATE queue SET status='playing' WHERE id=?", (nxt["id"],))
-        db.execute("UPDATE player_state SET status='playing', seek_to=NULL, "
-                   "position=0, duration=0, position_at=? WHERE id=1", (time.time(),))
+        new_status = "playing" if autoplay else "paused"
+        db.execute("UPDATE player_state SET status=?, seek_to=NULL, "
+                   "position=0, duration=0, position_at=? WHERE id=1",
+                   (new_status, time.time()))
     else:
         db.execute("UPDATE player_state SET status='stopped', seek_to=NULL, "
                    "position=0, duration=0, position_at=? WHERE id=1", (time.time(),))
@@ -499,7 +503,7 @@ def api_player_command():
 def api_player_ended():
     """Called by the player page when a song finishes naturally."""
     db = get_db()
-    advance(db)
+    advance(db, autoplay=False)
     db.execute("UPDATE player_state SET seq = seq + 1 WHERE id=1")
     db.commit()
     return jsonify(ok=True)

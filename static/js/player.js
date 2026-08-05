@@ -56,7 +56,7 @@ function reportPosition() {
 }
 setInterval(reportPosition, 3000);
 
-async function loadSong(it) {
+async function loadSong(it, status) {
   currentQueueId = it.queue_id;
   currentKind = it.kind;
   cdgActive = false;
@@ -73,7 +73,9 @@ async function loadSong(it) {
     video.src = "/media/" + it.song_id;
     video.volume = volume;
     video.onended = onEnded;
-    if (unlocked) video.play().catch(() => {});
+    // A song a natural "ended" queued up loads and is ready, but must NOT
+    // start playing itself — it's waiting for admin to press Play.
+    if (unlocked && status === "playing") video.play().catch(() => {});
   } else {
     // cdg or audio -> HTML5 audio + (optional) canvas graphics
     video.style.display = "none";
@@ -93,7 +95,7 @@ async function loadSong(it) {
     } else {
       canvas.style.display = "none";
     }
-    if (unlocked) audio.play().catch(() => {});
+    if (unlocked && status === "playing") audio.play().catch(() => {});
   }
   showOverlay(it);
 }
@@ -122,7 +124,7 @@ async function poll() {
   }
 
   if (state.current.queue_id !== currentQueueId) {
-    await loadSong(state.current);
+    await loadSong(state.current, state.status);
     return;
   }
 
