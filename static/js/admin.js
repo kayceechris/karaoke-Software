@@ -221,6 +221,17 @@ async function _refresh() {
   _refreshTimer = setTimeout(refresh, 3000);
 }
 
+// Each row's numbered badge must always reflect its actual visual
+// position, including live during a drag — otherwise there's a window
+// (mid-drag, or between drop and the next full refresh landing) where the
+// numbers are stale relative to the rows they're sitting in.
+function renumberPositionBadges() {
+  [...queueEl.querySelectorAll(".queue-item:not(.playing)")].forEach((row, idx) => {
+    const posEl = row.querySelector(".pos");
+    if (posEl) posEl.textContent = idx;
+  });
+}
+
 // Pointer-based drag reorder (unifies mouse + touch) — dragging a card past
 // a neighbor's midpoint swaps their DOM position live; on release, the
 // resulting order is sent as a whole to /api/queue/reorder.
@@ -240,18 +251,22 @@ function startDrag(e, card, handle) {
     // apply the first applicable move; the next event continues it.
     const siblings = [...queueEl.querySelectorAll(".queue-item:not(.playing)")]
       .filter((el) => el !== card);
+    let moved = false;
     for (const sib of siblings) {
       const r = sib.getBoundingClientRect();
       const mid = r.top + r.height / 2;
       const cardIsBefore = !!(card.compareDocumentPosition(sib) & Node.DOCUMENT_POSITION_FOLLOWING);
       if (cardIsBefore && ev.clientY > mid) {
         queueEl.insertBefore(card, sib.nextSibling);
+        moved = true;
         break;
       } else if (!cardIsBefore && ev.clientY < mid) {
         queueEl.insertBefore(card, sib);
+        moved = true;
         break;
       }
     }
+    if (moved) renumberPositionBadges();
   }
 
   async function onUp() {
@@ -260,6 +275,7 @@ function startDrag(e, card, handle) {
     handle.removeEventListener("pointercancel", onUp);
     card.style.transform = "";
     card.classList.remove("dragging");
+    renumberPositionBadges();
     const order = [...queueEl.querySelectorAll(".queue-item:not(.playing)")]
       .map((el) => parseInt(el.dataset.qid, 10));
     _draggingReorder = false;
