@@ -237,12 +237,12 @@ function renumberPositionBadges() {
 // resulting order is sent as a whole to /api/queue/reorder.
 function startDrag(e, card, handle) {
   e.preventDefault();
-  handle.setPointerCapture(e.pointerId);
   _draggingReorder = true;
   card.classList.add("dragging");
+  const startY = e.clientY;
 
   function onMove(ev) {
-    card.style.transform = `translateY(${ev.clientY - e.clientY}px)`;
+    card.style.transform = `translateY(${ev.clientY - startY}px)`;
     // At most ONE reorder per event: a fast (especially touch) drag can
     // cross several items' midpoints before a single pointermove fires, and
     // checking every sibling in one pass — each check against a DOM that
@@ -270,9 +270,9 @@ function startDrag(e, card, handle) {
   }
 
   async function onUp() {
-    handle.removeEventListener("pointermove", onMove);
-    handle.removeEventListener("pointerup", onUp);
-    handle.removeEventListener("pointercancel", onUp);
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
     card.style.transform = "";
     card.classList.remove("dragging");
     renumberPositionBadges();
@@ -288,9 +288,15 @@ function startDrag(e, card, handle) {
     refresh();
   }
 
-  handle.addEventListener("pointermove", onMove);
-  handle.addEventListener("pointerup", onUp);
-  handle.addEventListener("pointercancel", onUp);
+  // Listening on window (not the small drag-handle element) so the drag
+  // reliably ends wherever the pointer is released — a finger on touch
+  // easily drifts off a ~20px icon mid-drag, and per-element pointer
+  // capture wasn't reliably catching that, leaving the transform stuck
+  // (a card visually "running away", or a phantom gap where its unmoved
+  // layout box still reserves space while it's rendered elsewhere).
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onUp);
 }
 
 resolveRole().then(refresh);
