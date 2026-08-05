@@ -239,7 +239,7 @@ function startDrag(e, card, handle) {
   e.preventDefault();
   _draggingReorder = true;
   card.classList.add("dragging");
-  const startY = e.clientY;
+  let startY = e.clientY;
 
   function onMove(ev) {
     card.style.transform = `translateY(${ev.clientY - startY}px)`;
@@ -251,30 +251,55 @@ function startDrag(e, card, handle) {
     // apply the first applicable move; the next event continues it.
     const siblings = [...queueEl.querySelectorAll(".queue-item:not(.playing)")]
       .filter((el) => el !== card);
-    let moved = false;
     for (const sib of siblings) {
       const r = sib.getBoundingClientRect();
       const mid = r.top + r.height / 2;
       const cardIsBefore = !!(card.compareDocumentPosition(sib) & Node.DOCUMENT_POSITION_FOLLOWING);
-      if (cardIsBefore && ev.clientY > mid) {
-        queueEl.insertBefore(card, sib.nextSibling);
-        moved = true;
-        break;
-      } else if (!cardIsBefore && ev.clientY < mid) {
-        queueEl.insertBefore(card, sib);
-        moved = true;
-        break;
-      }
+      let target = null;
+      if (cardIsBefore && ev.clientY > mid) target = sib.nextSibling;
+      else if (!cardIsBefore && ev.clientY < mid) target = sib;
+      if (target === null) continue;
+
+      // The dragged card's painted position is its layout offset PLUS its
+      // transform offset. insertBefore only moves the layout offset — by a
+      // full row height — without touching the transform, so the two used
+      // to add together and the card would visibly leap away from the
+      // pointer on every swap ("runs away"). Shifting startY by however far
+      // the layout offset just jumped cancels that out, keeping
+      // translateY(pointer - startY) continuous right through the DOM move.
+      const beforeTop = card.offsetTop;
+      const sibBefore = sib.getBoundingClientRect();
+      queueEl.insertBefore(card, target);
+      startY += card.offsetTop - beforeTop;
+
+      // The displaced sibling would otherwise just snap into its new slot —
+      // it's already sitting there post-move, so paint it back at its old
+      // spot via transform, then let the CSS transition below ease it to 0.
+      const sibAfter = sib.getBoundingClientRect();
+      const dy = sibBefore.top - sibAfter.top;
+      sib.style.transition = "none";
+      sib.style.transform = `translateY(${dy}px)`;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          sib.style.transition = "";
+          sib.style.transform = "";
+        });
+      });
+
+      renumberPositionBadges();
+      break;
     }
-    if (moved) renumberPositionBadges();
   }
 
   async function onUp() {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
     window.removeEventListener("pointercancel", onUp);
-    card.style.transform = "";
+    // Remove .dragging first so the transition CSS rule re-applies to this
+    // card, THEN clear the transform — that order makes the final settle
+    // ease into place instead of snapping instantly.
     card.classList.remove("dragging");
+    card.style.transform = "";
     renumberPositionBadges();
     const order = [...queueEl.querySelectorAll(".queue-item:not(.playing)")]
       .map((el) => parseInt(el.dataset.qid, 10));
