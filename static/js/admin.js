@@ -32,10 +32,39 @@ seekEl.addEventListener("change", () => {
 seekEl.addEventListener("mouseup",  () => { _dragging = false; });
 seekEl.addEventListener("touchend", () => { _dragging = false; });
 
-// Hybrid/cloud mode: admin actions need the host token. Ask once, store it.
+// Hybrid/cloud mode: admin actions need a token. Ask once, store it. Either
+// the host token (full control) or a staff token (view + arrange the queue
+// only) works here — the role check below figures out which was entered.
 if (window.NEEDS_AUTH && !localStorage.getItem("host_token")) {
-  const t = prompt("Enter host token (set as HOST_TOKEN on the server):", "");
+  const t = prompt("Enter host or staff token:", "");
   if (t) localStorage.setItem("host_token", t.trim());
+}
+
+// "host" (full control), "staff" (queue view/arrange only), or "none" (bad
+// token) — resolved once at load, before the first render, so the UI never
+// flashes host controls that then have to be hidden.
+let ROLE = "host";
+
+async function resolveRole() {
+  if (!window.NEEDS_AUTH) return; // dev mode, no tokens configured at all
+  try {
+    const r = await api("/api/admin/role");
+    ROLE = r.role;
+  } catch (e) {
+    // Wrong/expired token — clear it and ask again rather than getting
+    // stuck silently unable to do anything.
+    localStorage.removeItem("host_token");
+    const t = prompt("Token not recognized. Enter host or staff token:", "");
+    if (t) {
+      localStorage.setItem("host_token", t.trim());
+      return resolveRole();
+    }
+    ROLE = "none";
+  }
+  if (ROLE !== "host") {
+    document.querySelector(".transport").style.display = "none";
+    document.querySelector(".seek-row").style.display = "none";
+  }
 }
 
 async function cmd(action, value) {
@@ -101,8 +130,16 @@ function setNow(state) {
   }
 }
 
+let _draggingReorder = false;
+
 async function refresh() {
   clearTimeout(_refreshTimer);
+  // A drag rebuilds nothing mid-gesture — a refresh landing here would tear
+  // out the very element the pointer is holding.
+  if (_draggingReorder) {
+    _refreshTimer = setTimeout(refresh, 3000);
+    return;
+  }
   let state, items;
   try {
     [state, items] = await Promise.all([
@@ -137,6 +174,7 @@ async function refresh() {
     const playing = it.status === "playing";
     const div = document.createElement("div");
     div.className = "card queue-item" + (playing ? " playing" : "");
+    div.dataset.qid = it.id;
     div.innerHTML = `
       <div class="pos">${playing ? "▶" : i}</div>
       <div class="meta"><div class="title"></div><div class="artist"></div></div>`;
@@ -145,40 +183,12 @@ async function refresh() {
     div.querySelector(".artist").textContent = (it.artist || "Unknown") + " · 🎤 " + it.singer;
 
     if (!playing) {
-      const waitIdx = waitingItems.indexOf(it);
-
-      const up = document.createElement("button");
-      up.className = "btn btn-ghost btn-icon";
-      up.title = "Move up"; up.textContent = "↑";
-      up.disabled = waitIdx <= 0;
-      up.onclick = async () => {
-        await api(`/api/queue/${it.id}/move`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ direction: "up" }),
-        });
-        refresh();
-      };
-      div.appendChild(up);
-
-      const down = document.createElement("button");
-      down.className = "btn btn-ghost btn-icon";
-      down.title = "Move down"; down.textContent = "↓";
-      down.disabled = waitIdx === waitingItems.length - 1;
-      down.onclick = async () => {
-        await api(`/api/queue/${it.id}/move`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ direction: "down" }),
-        });
-        refresh();
-      };
-      div.appendChild(down);
-
-      const top = document.createElement("button");
-      top.className = "btn btn-ghost btn-icon";
-      top.title = "Move to top"; top.textContent = "⤒";
-      top.disabled = waitIdx <= 0;
-      top.onclick = async () => { await api(`/api/queue/${it.id}/top`, { method: "POST" }); refresh(); };
-      div.appendChild(top);
+      const handle = document.createElement("div");
+      handle.className = "drag-handle";
+      handle.title = "Drag to reorder";
+      handle.textContent = "⠿";
+      div.appendChild(handle);
+      handle.addEventListener("pointerdown", (e) => startDrag(e, div, handle));
     }
     const del = document.createElement("button");
     del.className = "btn btn-danger btn-icon";
@@ -195,4 +205,51 @@ async function refresh() {
   _refreshTimer = setTimeout(refresh, 3000);
 }
 
-refresh();
+// Pointer-based drag reorder (unifies mouse + touch) — dragging a card past
+// a neighbor's midpoint swaps their DOM position live; on release, the
+// resulting order is sent as a whole to /api/queue/reorder.
+function startDrag(e, card, handle) {
+  e.preventDefault();
+  handle.setPointerCapture(e.pointerId);
+  _draggingReorder = true;
+  card.classList.add("dragging");
+
+  function onMove(ev) {
+    card.style.transform = `translateY(${ev.clientY - e.clientY}px)`;
+    const siblings = [...queueEl.querySelectorAll(".queue-item:not(.playing)")];
+    for (const sib of siblings) {
+      if (sib === card) continue;
+      const r = sib.getBoundingClientRect();
+      const mid = r.top + r.height / 2;
+      if (ev.clientY < mid && sib.previousElementSibling === card) {
+        queueEl.insertBefore(card, sib);
+      } else if (ev.clientY > mid && sib.nextElementSibling === card) {
+        queueEl.insertBefore(card, sib.nextSibling);
+      }
+    }
+  }
+
+  async function onUp() {
+    handle.removeEventListener("pointermove", onMove);
+    handle.removeEventListener("pointerup", onUp);
+    handle.removeEventListener("pointercancel", onUp);
+    card.style.transform = "";
+    card.classList.remove("dragging");
+    const order = [...queueEl.querySelectorAll(".queue-item:not(.playing)")]
+      .map((el) => parseInt(el.dataset.qid, 10));
+    _draggingReorder = false;
+    try {
+      await api("/api/queue/reorder", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order }),
+      });
+    } catch (err) { toast(err.message); }
+    refresh();
+  }
+
+  handle.addEventListener("pointermove", onMove);
+  handle.addEventListener("pointerup", onUp);
+  handle.addEventListener("pointercancel", onUp);
+}
+
+resolveRole().then(refresh);

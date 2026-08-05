@@ -34,6 +34,10 @@ from flask import (Flask, jsonify, render_template, request, abort, send_file,
 import db
 
 HOST_TOKEN = os.environ.get("HOST_TOKEN", "")
+# Lesser tier: view + arrange the queue (reorder, delete), but no transport
+# control (play/pause/next/stop/seek/volume) and no catalog management —
+# those stay host-only. Unset -> no staff tier, only the host token works.
+STAFF_TOKEN = os.environ.get("STAFF_TOKEN", "")
 R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL", "").rstrip("/")
 # The agent's LAN player URL (e.g. http://192.168.1.23:5050/player), printed
 # in its startup banner. The cloud can't discover this on its own — it's a
@@ -56,10 +60,30 @@ def host_ok():
     return supplied == HOST_TOKEN
 
 
+def staff_ok():
+    # Host token always satisfies staff-level checks too (host is a
+    # superset); the staff token only satisfies staff-level checks.
+    if host_ok():
+        return True
+    if not STAFF_TOKEN:
+        return False
+    supplied = request.headers.get("X-Host-Token") or request.args.get("key")
+    return supplied == STAFF_TOKEN
+
+
 def require_host(fn):
     @wraps(fn)
     def wrapper(*a, **kw):
         if not host_ok():
+            abort(401)
+        return fn(*a, **kw)
+    return wrapper
+
+
+def require_staff(fn):
+    @wraps(fn)
+    def wrapper(*a, **kw):
+        if not staff_ok():
             abort(401)
         return fn(*a, **kw)
     return wrapper
@@ -82,7 +106,20 @@ def tablet():
 
 @app.route("/admin")
 def admin():
-    return render_template("admin.html", auth=bool(HOST_TOKEN))
+    return render_template("admin.html", auth=bool(HOST_TOKEN or STAFF_TOKEN))
+
+
+@app.route("/api/admin/role")
+def api_admin_role():
+    """Tells the admin page what the supplied token can actually do, so it
+    can show/hide the transport controls accordingly. This is a UX signal,
+    not the security boundary — every route still checks its own token
+    server-side regardless of what this reports."""
+    if host_ok():
+        return jsonify(role="host")
+    if staff_ok():
+        return jsonify(role="staff")
+    return jsonify(role="none"), 401
 
 
 @app.route("/player")
@@ -418,14 +455,14 @@ def api_queue_add():
 
 
 @app.route("/api/queue/<int:qid>", methods=["DELETE"])
-@require_host
+@require_staff
 def api_queue_remove(qid):
     db.execute("DELETE FROM queue WHERE id=?", (qid,))
     return jsonify(ok=True)
 
 
 @app.route("/api/queue/<int:qid>/top", methods=["POST"])
-@require_host
+@require_staff
 def api_queue_top(qid):
     minpos = db.fetchone(
         "SELECT COALESCE(MIN(position),1) AS p FROM queue WHERE status='waiting'"
@@ -436,7 +473,7 @@ def api_queue_top(qid):
 
 
 @app.route("/api/queue/<int:qid>/move", methods=["POST"])
-@require_host
+@require_staff
 def api_queue_move(qid):
     """Swap a waiting item with its immediate neighbor (direction: up/down)."""
     data = request.get_json(force=True)
@@ -456,6 +493,31 @@ def api_queue_move(qid):
         with db.transaction() as cur:
             db.x(cur, "UPDATE queue SET position=? WHERE id=?", (b["position"], a["id"]))
             db.x(cur, "UPDATE queue SET position=? WHERE id=?", (a["position"], b["id"]))
+    return jsonify(ok=True)
+
+
+@app.route("/api/queue/reorder", methods=["POST"])
+@require_staff
+def api_queue_reorder():
+    """Drag-and-drop reorder: body is {"order": [id, id, ...]} — every
+    currently-waiting queue id, in the desired new order. Renumbers position
+    1..N to match; any id that's no longer actually waiting (e.g. it started
+    playing or got deleted between the drag starting and finishing) is
+    skipped rather than erroring the whole request."""
+    data = request.get_json(force=True)
+    order = data.get("order")
+    if not isinstance(order, list) or not order:
+        abort(400)
+    waiting_ids = {r["id"] for r in db.fetchall(
+        "SELECT id FROM queue WHERE status='waiting'")}
+    with db.transaction() as cur:
+        pos = 1
+        for qid in order:
+            if qid not in waiting_ids:
+                continue
+            db.x(cur, "UPDATE queue SET position=? WHERE id=? AND status='waiting'",
+                 (pos, qid))
+            pos += 1
     return jsonify(ok=True)
 
 

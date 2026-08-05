@@ -182,6 +182,14 @@ input[type="search"]:focus, input[type="text"]:focus {
 .queue-item.playing { border-color: rgba(255, 61, 127, .5); background: rgba(255, 61, 127, .08); box-shadow: var(--glow-pink); }
 .queue-item.playing .pos { background: var(--grad); color: #fff; border: none; }
 .card.removing { animation: cardOut .3s ease forwards; }
+
+.drag-handle {
+  cursor: grab; touch-action: none; user-select: none;
+  color: var(--muted); font-size: 20px; line-height: 1; padding: 4px 6px;
+  flex: none;
+}
+.drag-handle:active { cursor: grabbing; }
+.queue-item.dragging { opacity: .5; box-shadow: none; }
 @keyframes cardOut { to { opacity: 0; transform: translateX(40px); height: 0; padding: 0; margin: 0; } }
 
 .empty { color: var(--muted); text-align: center; padding: 46px 0; }

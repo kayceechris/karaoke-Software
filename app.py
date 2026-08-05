@@ -357,6 +357,30 @@ def api_queue_move(qid):
     return jsonify(ok=True)
 
 
+@app.route("/api/queue/reorder", methods=["POST"])
+def api_queue_reorder():
+    """Drag-and-drop reorder: body is {"order": [id, id, ...]} — every
+    currently-waiting queue id, in the desired new order. Renumbers position
+    1..N to match; any id that's no longer actually waiting is skipped
+    rather than erroring the whole request."""
+    data = request.get_json(force=True)
+    order = data.get("order")
+    if not isinstance(order, list) or not order:
+        abort(400)
+    db = get_db()
+    waiting_ids = {r["id"] for r in db.execute(
+        "SELECT id FROM queue WHERE status='waiting'").fetchall()}
+    pos = 1
+    for qid in order:
+        if qid not in waiting_ids:
+            continue
+        db.execute("UPDATE queue SET position=? WHERE id=? AND status='waiting'",
+                   (pos, qid))
+        pos += 1
+    db.commit()
+    return jsonify(ok=True)
+
+
 # --------------------------------------------------------------------------
 # Player control + state
 # --------------------------------------------------------------------------

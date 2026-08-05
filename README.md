@@ -44,6 +44,15 @@ local file on the TV.
 - **Host:** open `https://<your-cloud-url>/admin`, enter the `HOST_TOKEN` once, control playback.
 - Add/remove song files on the laptop, then restart the agent (or `POST /api/resync`) to refresh.
 
+### Optional: a second admin tier for staff (no player control)
+
+Set `STAFF_TOKEN` on Render (Environment tab, same as `HOST_TOKEN`) to hand
+out a second `/admin` login for other staff: they can view the queue,
+drag-reorder it, and delete songs, but the transport controls (play,
+pause, next, stop, restart, volume, seek) stay hidden and are rejected
+server-side even if called directly — only `HOST_TOKEN` can touch those.
+Leave unset to skip this entirely.
+
 ### Optional: a "watch" link/QR on the cloud tablet
 
 `/tablet` is text-only (title/singer, no video) — the real picture and sound
@@ -133,7 +142,8 @@ Downloads karaoke videos as `Artist - Title.mp4` into `songs/`. Re-run the agent
 | Var | Used by | Meaning |
 |-----|---------|---------|
 | `DATABASE_URL` | cloud | Postgres URL (Render sets it). Unset → local SQLite |
-| `HOST_TOKEN` | cloud + agent | Shared secret for admin + catalog/control. Unset → auth off (dev only) |
+| `HOST_TOKEN` | cloud + agent | Shared secret for full admin control + catalog. Unset → auth off (dev only) |
+| `STAFF_TOKEN` | cloud | Optional second admin login: queue view/reorder/delete only, no player transport. Unset → no staff tier |
 | `CLOUD_URL` | agent | URL of the deployed cloud brain |
 | `KARAOKE_SONGS_DIR` | agent / offline | Songs folder (default `./songs`) |
 | `AGENT_PORT` / `KARAOKE_PORT` | agent / offline | Local port (5050 / 5000) |
