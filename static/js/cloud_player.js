@@ -84,6 +84,9 @@ async function loadSong(it, startAt, status) {
     m.addEventListener("loadedmetadata", () => { m.currentTime = seekTo; }, { once: true });
   }
 
+  video.playbackRate = 1;
+  audio.playbackRate = 1;
+
   if (it.kind === "video") {
     audio.pause(); audio.removeAttribute("src");
     canvas.style.display = "none";
@@ -143,31 +146,41 @@ async function poll() {
     if (state.current.queue_id !== currentQueueId) { await loadSong(state.current, state.position, state.status); return; }
 
     const m = activeMedia();
-    const drift = isFinite(m.currentTime) ? Math.abs(m.currentTime - state.position) : 0;
+    // Signed: positive = this player is ahead of the host, negative = behind.
+    const diff = isFinite(m.currentTime) ? m.currentTime - state.position : 0;
+    const absDiff = Math.abs(diff);
     if (state.seek_to != null) {
       // An explicit admin seek/restart — everyone follows this. This player
       // never acknowledges seek_to (it's read-only), but the host does, and
       // the host's ack can clear seek_to before this player's next poll
       // ever reads it — the plain drift check below catches a missed
-      // restart too (the resulting gap is far past the drift threshold).
+      // restart too (the resulting gap is far past the hard-jump threshold).
       m.currentTime = state.seek_to;
-    } else if (state.status === "playing" && drift > 5) {
-      // Correcting currentTime causes a visible decode/keyframe hiccup even
-      // when nothing stalls on the network (confirmed via DevTools — no
-      // stalled requests, the stutter is purely from seeking itself). The
-      // LAN player's tight 2s threshold is fine there because true drift is
-      // rare enough that it almost never fires; over R2 the position report
-      // round-trip alone can put the reading a couple seconds off on any
-      // given poll, so a tight threshold ends up correcting on nearly every
-      // 1s tick — a continuous stutter instead of an occasional one. A
-      // looser threshold accepts a few seconds of slack so corrections stay
-      // rare, only stepping in for drift big enough to actually matter.
+      m.playbackRate = 1;
+    } else if (state.status === "playing" && absDiff > 5) {
+      // Big gap (a missed restart, or drift that got away from the gentle
+      // correction below) — a hard jump is the only way to close it
+      // promptly. Rare by design, so the resulting stutter is rare too.
       m.currentTime = state.position;
+      m.playbackRate = 1;
+    } else if (state.status === "playing" && absDiff > 0.5) {
+      // Gentle correction for everyday drift: nudge playbackRate instead of
+      // jumping currentTime, so a persistent small gap (a few seconds, from
+      // the position-report round-trip alone) closes gradually with no
+      // visible stutter — rather than either sitting there forever (a fixed
+      // hard-jump threshold has to be loose to avoid stuttering, so
+      // anything under it never gets corrected) or stuttering on every poll
+      // (a tight hard-jump threshold fires almost constantly). Muted video
+      // has no audio pitch to protect, so the rate change itself is the
+      // only side effect, and it's small enough not to be noticeable.
+      m.playbackRate = diff > 0 ? 0.92 : 1.08;
+    } else if (state.status === "playing") {
+      m.playbackRate = 1;
     }
 
     if (state.status === "playing" && m.paused && unlocked && !songEnded) m.play().catch(() => {});
-    else if (state.status === "paused" && !m.paused) m.pause();
-    else if (state.status === "stopped") m.pause();
+    else if (state.status === "paused" && !m.paused) { m.pause(); m.playbackRate = 1; }
+    else if (state.status === "stopped") { m.pause(); m.playbackRate = 1; }
   } finally {
     polling = false;
   }
