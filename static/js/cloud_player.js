@@ -149,13 +149,19 @@ async function poll() {
       // never acknowledges seek_to (it's read-only), but the host does, and
       // the host's ack can clear seek_to before this player's next poll
       // ever reads it — the plain drift check below catches a missed
-      // restart too (the resulting gap is far past the 2s threshold).
+      // restart too (the resulting gap is far past the drift threshold).
       m.currentTime = state.seek_to;
-    } else if (state.status === "playing" && drift > 2) {
-      // Same loose (2s) drift-correction safety net used by the LAN player,
-      // checked every poll (1s), no cooldown — confirmed via DevTools that
-      // seeking against R2 doesn't stall/rebuffer in practice, so there's
-      // no re-buffer-thrashing risk to guard against here.
+    } else if (state.status === "playing" && drift > 5) {
+      // Correcting currentTime causes a visible decode/keyframe hiccup even
+      // when nothing stalls on the network (confirmed via DevTools — no
+      // stalled requests, the stutter is purely from seeking itself). The
+      // LAN player's tight 2s threshold is fine there because true drift is
+      // rare enough that it almost never fires; over R2 the position report
+      // round-trip alone can put the reading a couple seconds off on any
+      // given poll, so a tight threshold ends up correcting on nearly every
+      // 1s tick — a continuous stutter instead of an occasional one. A
+      // looser threshold accepts a few seconds of slack so corrections stay
+      // rare, only stepping in for drift big enough to actually matter.
       m.currentTime = state.position;
     }
 
