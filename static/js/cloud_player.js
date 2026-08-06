@@ -22,9 +22,6 @@ let volume = 1.0;
 let cdgActive = false;
 let songEnded = false;
 let lastCorrectionAt = 0;
-// How far ahead of the host's reported position this player targets, to
-// cancel out R2 fetch/decode latency (see loadSong/poll below).
-const LEAD_SECONDS = 1;
 
 // This player is always muted — it's a silent visual mirror for guests off
 // the venue Wi-Fi, never a second audio source. Muted playback is allowed
@@ -80,15 +77,10 @@ async function loadSong(it, startAt, status) {
   // restarting it from 0:00 — this page can be opened at any point mid-song.
   // Ignore anything under 2s: a brand-new song resets to position 0 on the
   // server, but server-clock extrapolation may have nudged it forward a
-  // touch by the time this poll reads it back. Once we do seek, aim
-  // LEAD_SECONDS ahead of the host's reported position — R2/CDN fetch +
-  // decode latency otherwise shows up as this player lagging the host by
-  // about that much in practice, so starting with a head start cancels it
-  // out instead of correcting for it after the fact.
-  const rawStart = startAt || 0;
+  // touch by the time this poll reads it back.
+  const seekTo = startAt || 0;
   function seekOnceReady(m) {
-    if (rawStart < 2) return;
-    const seekTo = rawStart + LEAD_SECONDS;
+    if (seekTo < 2) return;
     if (m.readyState >= 1) { m.currentTime = seekTo; return; }
     m.addEventListener("loadedmetadata", () => { m.currentTime = seekTo; }, { once: true });
   }
@@ -171,13 +163,8 @@ async function poll() {
       lastCorrectionAt = Date.now();
     } else if (state.status === "playing" && drift > 2 &&
                Date.now() - lastCorrectionAt > 4000) {
-      // Same loose (2s) drift-correction safety net used by the LAN player.
-      // Note: no LEAD_SECONDS here — the head start only applies once, at
-      // the start of a song (loadSong above); ongoing correction targets
-      // the host's actual position, not the offset one, or the lead would
-      // just get baked into steady-state playback instead of being a
-      // one-time compensation for initial fetch/decode latency.
-      // Plus a 4s cooldown between attempts that the LAN player doesn't
+      // Same loose (2s) drift-correction safety net used by the LAN player,
+      // plus a 4s cooldown between attempts that the LAN player doesn't
       // need: correcting currentTime against an R2/CDN stream forces a
       // re-buffer, and while that's in flight (m.seeking stays true) a
       // guard of "!m.seeking" would just block every following correction
