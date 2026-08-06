@@ -21,6 +21,7 @@ let currentKind = null;
 let volume = 1.0;
 let cdgActive = false;
 let songEnded = false;
+let lastCorrectionAt = 0;
 
 // This player is always muted — it's a silent visual mirror for guests off
 // the venue Wi-Fi, never a second audio source. Muted playback is allowed
@@ -146,14 +147,20 @@ async function poll() {
     if (state.seek_to != null) {
       // An explicit admin seek/restart — everyone follows this.
       m.currentTime = state.seek_to;
-    } else if (state.status === "playing" && !m.seeking &&
-               isFinite(m.currentTime) && Math.abs(m.currentTime - state.position) > 2) {
-      // Same loose (2s) drift-correction safety net used by the LAN player:
-      // a viewer's decoder can genuinely run at a slightly different real-
-      // world rate than the host's. Tight/frequent correction against a CDN
-      // stream causes visible rebuffering stutter — this only fires rarely,
-      // as a backstop against finishing early or falling far behind.
+    } else if (state.status === "playing" &&
+               isFinite(m.currentTime) && Math.abs(m.currentTime - state.position) > 2 &&
+               Date.now() - lastCorrectionAt > 4000) {
+      // Same loose (2s) drift-correction safety net used by the LAN player,
+      // plus a 4s cooldown between attempts that the LAN player doesn't
+      // need: correcting currentTime against an R2/CDN stream forces a
+      // re-buffer, and while that's in flight (m.seeking stays true) a
+      // guard of "!m.seeking" would just block every following correction
+      // until it clears — on a slow connection that can outlast the 1s
+      // poll, so drift keeps compounding while corrections stay locked out
+      // (the "player escapes the host" symptom). A flat cooldown instead
+      // gives each re-buffer a fixed window to finish before trying again.
       m.currentTime = state.position;
+      lastCorrectionAt = Date.now();
     }
 
     if (state.status === "playing" && m.paused && unlocked && !songEnded) m.play().catch(() => {});
