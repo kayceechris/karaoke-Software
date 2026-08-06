@@ -157,19 +157,23 @@ async function poll() {
       m.currentTime = state.seek_to;
     } else if (state.status === "playing" &&
                isFinite(m.currentTime) &&
-               Math.abs(m.currentTime - (state.position + LEAD_SECONDS)) > 2 &&
+               Math.abs(m.currentTime - state.position) > 2 &&
                Date.now() - lastCorrectionAt > 4000) {
-      // Same loose (2s) drift-correction safety net used by the LAN player,
-      // targeting LEAD_SECONDS ahead of the host (see loadSong above), plus
-      // a 4s cooldown between attempts that the LAN player doesn't need:
-      // correcting currentTime against an R2/CDN stream forces a re-buffer,
-      // and while that's in flight (m.seeking stays true) a guard of
-      // "!m.seeking" would just block every following correction until it
-      // clears — on a slow connection that can outlast the 1s poll, so
-      // drift keeps compounding while corrections stay locked out (the
-      // "player escapes the host" symptom). A flat cooldown instead gives
-      // each re-buffer a fixed window to finish before trying again.
-      m.currentTime = state.position + LEAD_SECONDS;
+      // Same loose (2s) drift-correction safety net used by the LAN player.
+      // Note: no LEAD_SECONDS here — the head start only applies once, at
+      // the start of a song (loadSong above); ongoing correction targets
+      // the host's actual position, not the offset one, or the lead would
+      // just get baked into steady-state playback instead of being a
+      // one-time compensation for initial fetch/decode latency.
+      // Plus a 4s cooldown between attempts that the LAN player doesn't
+      // need: correcting currentTime against an R2/CDN stream forces a
+      // re-buffer, and while that's in flight (m.seeking stays true) a
+      // guard of "!m.seeking" would just block every following correction
+      // until it clears — on a slow connection that can outlast the 1s
+      // poll, so drift keeps compounding while corrections stay locked out
+      // (the "player escapes the host" symptom). A flat cooldown instead
+      // gives each re-buffer a fixed window to finish before trying again.
+      m.currentTime = state.position;
       lastCorrectionAt = Date.now();
     }
 
