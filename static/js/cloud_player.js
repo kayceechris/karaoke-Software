@@ -21,13 +21,6 @@ let currentKind = null;
 let volume = 1.0;
 let cdgActive = false;
 let songEnded = false;
-// Small head start applied only at the moment a song starts (initial
-// mid-song join, and an explicit seek/restart) — never to the ongoing drift
-// correction below. It exists to cancel out the brief R2 fetch/decode
-// latency right as a new src loads; baking it into steady-state playback
-// instead just made the player run further ahead over time (tried before,
-// removed).
-const LEAD_SECONDS = 0.2;
 
 // This player is always muted — it's a silent visual mirror for guests off
 // the venue Wi-Fi, never a second audio source. Muted playback is allowed
@@ -84,10 +77,9 @@ async function loadSong(it, startAt, status) {
   // Ignore anything under 2s: a brand-new song resets to position 0 on the
   // server, but server-clock extrapolation may have nudged it forward a
   // touch by the time this poll reads it back.
-  const rawStart = startAt || 0;
+  const seekTo = startAt || 0;
   function seekOnceReady(m) {
-    if (rawStart < 2) return;
-    const seekTo = rawStart + LEAD_SECONDS;
+    if (seekTo < 2) return;
     if (m.readyState >= 1) { m.currentTime = seekTo; return; }
     m.addEventListener("loadedmetadata", () => { m.currentTime = seekTo; }, { once: true });
   }
@@ -153,14 +145,12 @@ async function poll() {
     const m = activeMedia();
     const drift = isFinite(m.currentTime) ? Math.abs(m.currentTime - state.position) : 0;
     if (state.seek_to != null) {
-      // An explicit admin seek/restart — everyone follows this, with the
-      // same small head start as a fresh song load (see LEAD_SECONDS
-      // above). This player never acknowledges seek_to (it's read-only),
-      // but the host does, and the host's ack can clear seek_to before this
-      // player's next poll ever reads it — the plain drift check below
-      // catches a missed restart too (the resulting gap is far past the
-      // drift threshold).
-      m.currentTime = state.seek_to + LEAD_SECONDS;
+      // An explicit admin seek/restart — everyone follows this. This player
+      // never acknowledges seek_to (it's read-only), but the host does, and
+      // the host's ack can clear seek_to before this player's next poll
+      // ever reads it — the plain drift check below catches a missed
+      // restart too (the resulting gap is far past the drift threshold).
+      m.currentTime = state.seek_to;
     } else if (state.status === "playing" && drift > 5) {
       // Correcting currentTime causes a visible decode/keyframe hiccup even
       // when nothing stalls on the network (confirmed via DevTools — no
