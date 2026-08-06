@@ -203,7 +203,10 @@ input[type="search"]:focus, input[type="text"]:focus {
 
 /* ---- inline read-only player embed (tablet) ---- */
 .player-embed {
-  position: relative;
+  position: sticky;
+  top: 70px; /* sits flush under .appbar (also sticky, top:0) — kept in
+                sync with its height across the breakpoints below */
+  z-index: 20;
   background: #000;
   border-radius: var(--radius);
   overflow: hidden;
@@ -346,6 +349,7 @@ code.url { color: var(--cyan); word-break: break-all; }
   .appbar { padding: 10px 14px; gap: 10px; }
   .appbar .logo { height: 34px; padding: 4px 7px; }
   .appbar .brand b { font-size: 17px; }
+  .player-embed { top: 55px; }
   .now { padding: 16px 18px; border-radius: 18px; }
   .now .np-title { font-size: 19px; }
   .card { gap: 10px; padding: 10px 12px; }
@@ -361,6 +365,7 @@ code.url { color: var(--cyan); word-break: break-all; }
   .appbar .logo { height: 28px; padding: 3px 6px; }
   .appbar .brand b { font-size: 15px; }
   .appbar .brand span { display: none; }
+  .player-embed { top: 45px; }
   .now { padding: 12px 14px; }
   .now .np-title { font-size: 16px; }
   .now .np-meta { font-size: 13px; }
