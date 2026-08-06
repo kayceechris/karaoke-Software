@@ -231,6 +231,11 @@ input[type="search"]:focus, input[type="text"]:focus {
   color: var(--cyan); font-size: 10px; letter-spacing: 1px;
   text-transform: uppercase; display: block;
 }
+/* Mobile-only — on a laptop/desktop the host's own player (or the
+   dedicated /player page) is the intended way to watch. */
+@media (min-width: 768px) {
+  .player-embed { display: none; }
+}
 
 .empty { color: var(--muted); text-align: center; padding: 46px 0; }
 .empty .big { font-size: 40px; margin-bottom: 8px; filter: grayscale(.3); }
