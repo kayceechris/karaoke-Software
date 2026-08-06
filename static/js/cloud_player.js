@@ -21,7 +21,6 @@ let currentKind = null;
 let volume = 1.0;
 let cdgActive = false;
 let songEnded = false;
-let lastCorrectionAt = 0;
 
 // This player is always muted — it's a silent visual mirror for guests off
 // the venue Wi-Fi, never a second audio source. Muted playback is allowed
@@ -146,34 +145,18 @@ async function poll() {
     const m = activeMedia();
     const drift = isFinite(m.currentTime) ? Math.abs(m.currentTime - state.position) : 0;
     if (state.seek_to != null) {
-      // An explicit admin seek/restart — everyone follows this.
+      // An explicit admin seek/restart — everyone follows this. This player
+      // never acknowledges seek_to (it's read-only), but the host does, and
+      // the host's ack can clear seek_to before this player's next poll
+      // ever reads it — the plain drift check below catches a missed
+      // restart too (the resulting gap is far past the 2s threshold).
       m.currentTime = state.seek_to;
-      lastCorrectionAt = Date.now();
-    } else if (state.status === "playing" && drift > 8) {
-      // A big jump (restart/seek) always applies immediately, bypassing the
-      // cooldown below. This player never acknowledges seek_to (it's
-      // read-only), but the HOST does — and the host's ack can clear
-      // seek_to before this player's next poll ever reads it, especially
-      // over a slower off-site connection. Without this, a restart landing
-      // in that gap would be silently missed entirely (this player just
-      // keeps playing wherever it already was) rather than merely delayed.
-      // A drift this large can't be normal decode drift, so treat it as a
-      // seek regardless of how it got missed.
-      m.currentTime = state.position;
-      lastCorrectionAt = Date.now();
-    } else if (state.status === "playing" && drift > 2 &&
-               Date.now() - lastCorrectionAt > 4000) {
+    } else if (state.status === "playing" && drift > 2) {
       // Same loose (2s) drift-correction safety net used by the LAN player,
-      // plus a 4s cooldown between attempts that the LAN player doesn't
-      // need: correcting currentTime against an R2/CDN stream forces a
-      // re-buffer, and while that's in flight (m.seeking stays true) a
-      // guard of "!m.seeking" would just block every following correction
-      // until it clears — on a slow connection that can outlast the 1s
-      // poll, so drift keeps compounding while corrections stay locked out
-      // (the "player escapes the host" symptom). A flat cooldown instead
-      // gives each re-buffer a fixed window to finish before trying again.
+      // checked every poll (1s), no cooldown — confirmed via DevTools that
+      // seeking against R2 doesn't stall/rebuffer in practice, so there's
+      // no re-buffer-thrashing risk to guard against here.
       m.currentTime = state.position;
-      lastCorrectionAt = Date.now();
     }
 
     if (state.status === "playing" && m.paused && unlocked && !songEnded) m.play().catch(() => {});
