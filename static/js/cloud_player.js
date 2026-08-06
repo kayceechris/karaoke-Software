@@ -152,12 +152,24 @@ async function poll() {
     if (state.current.queue_id !== currentQueueId) { await loadSong(state.current, state.position, state.status); return; }
 
     const m = activeMedia();
+    const drift = isFinite(m.currentTime) ? Math.abs(m.currentTime - state.position) : 0;
     if (state.seek_to != null) {
       // An explicit admin seek/restart — everyone follows this.
       m.currentTime = state.seek_to;
-    } else if (state.status === "playing" &&
-               isFinite(m.currentTime) &&
-               Math.abs(m.currentTime - state.position) > 2 &&
+      lastCorrectionAt = Date.now();
+    } else if (state.status === "playing" && drift > 8) {
+      // A big jump (restart/seek) always applies immediately, bypassing the
+      // cooldown below. This player never acknowledges seek_to (it's
+      // read-only), but the HOST does — and the host's ack can clear
+      // seek_to before this player's next poll ever reads it, especially
+      // over a slower off-site connection. Without this, a restart landing
+      // in that gap would be silently missed entirely (this player just
+      // keeps playing wherever it already was) rather than merely delayed.
+      // A drift this large can't be normal decode drift, so treat it as a
+      // seek regardless of how it got missed.
+      m.currentTime = state.position;
+      lastCorrectionAt = Date.now();
+    } else if (state.status === "playing" && drift > 2 &&
                Date.now() - lastCorrectionAt > 4000) {
       // Same loose (2s) drift-correction safety net used by the LAN player.
       // Note: no LEAD_SECONDS here — the head start only applies once, at
