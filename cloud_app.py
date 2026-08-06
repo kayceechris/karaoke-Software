@@ -569,7 +569,13 @@ def _extrapolate(st):
     dur = st.get("duration") or 0
     at = st.get("position_at")
     if st["status"] == "playing" and at:
-        pos += max(0, time.time() - at)
+        # Reports land every ~3s under normal operation. If they've stopped
+        # landing for much longer than that (a stale/mismatched host
+        # session, a network hiccup) there's nothing to bound how far this
+        # would otherwise extrapolate ahead of the real position — cap how
+        # far past the last known-good report we're willing to guess.
+        elapsed = min(max(0, time.time() - at), 10)
+        pos += elapsed
         if dur:
             pos = min(pos, dur)
     return pos, dur

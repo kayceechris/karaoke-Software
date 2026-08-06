@@ -424,7 +424,10 @@ def _extrapolate(st):
     dur = st["duration"] or 0
     at = st["position_at"]
     if st["status"] == "playing" and at:
-        pos += max(0, time.time() - at)
+        # See cloud_app.py's _extrapolate — cap how far past the last known
+        # position report this is willing to guess.
+        elapsed = min(max(0, time.time() - at), 10)
+        pos += elapsed
         if dur:
             pos = min(pos, dur)
     return pos, dur
