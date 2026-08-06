@@ -36,6 +36,17 @@
       <div class="np-meta" id="npMeta">Search a song below and add it to the queue</div>
     </div>
 
+    <!-- Read-only mirror of the live show — same muted, passive-follower
+         behavior as /player, just embedded inline instead of opened
+         separately. -->
+    <div class="player-embed" id="playerEmbed">
+      <div id="idle">🎤 Ready — add a song below</div>
+      <video id="video" style="display:none" playsinline preload="auto"></video>
+      <canvas id="cdg" style="display:none"></canvas>
+      <audio id="audio" style="display:none" preload="auto"></audio>
+      <div id="overlay" style="display:none"><small id="singer"></small><span id="title"></span></div>
+    </div>
+
     <div class="search">
       <span class="ico">🔎</span>
       <input id="q" type="search" placeholder="Search song or artist…" autocomplete="off">
@@ -65,5 +76,7 @@
   <div id="toast"></div>
   <script src="/static/js/common.js"></script>
   <script src="/static/js/tablet.js"></script>
+  <script src="/static/js/cdg.js"></script>
+  <script src="/static/js/cloud_player.js"></script>
 </body>
 </html>

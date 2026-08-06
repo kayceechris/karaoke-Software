@@ -201,6 +201,34 @@ input[type="search"]:focus, input[type="text"]:focus {
 .queue-item.dragging { opacity: .5; box-shadow: none; transition: none; }
 @keyframes cardOut { to { opacity: 0; transform: translateX(40px); height: 0; padding: 0; margin: 0; } }
 
+/* ---- inline read-only player embed (tablet) ---- */
+.player-embed {
+  position: relative;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 14px 0;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.player-embed video { max-width: 100%; max-height: 100%; }
+.player-embed canvas { image-rendering: pixelated; height: 100%; aspect-ratio: 300 / 216; }
+.player-embed #idle {
+  color: var(--muted); text-align: center; font-size: 15px;
+  padding: 0 20px; font-family: inherit;
+}
+.player-embed #overlay {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 14px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, .85)); color: #fff;
+  font-size: 15px;
+}
+.player-embed #overlay small {
+  color: var(--cyan); font-size: 10px; letter-spacing: 1px;
+  text-transform: uppercase; display: block;
+}
+
 .empty { color: var(--muted); text-align: center; padding: 46px 0; }
 .empty .big { font-size: 40px; margin-bottom: 8px; filter: grayscale(.3); }
 
